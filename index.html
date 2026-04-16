@@ -125,7 +125,7 @@
             font-weight: bold;
             border-radius: 6px;
             display: none;
-            z-index: 3000;
+            z-index: 4000;
             box-shadow: 0 5px 15px rgba(0,0,0,0.5);
         }
 
@@ -142,11 +142,25 @@
         }
         #preview-img {
             max-width: 100%;
-            max-height: 45%;
+            max-height: 40%;
             border: 3px solid #0ff;
             border-radius: 12px;
             margin-bottom: 20px;
         }
+
+        .exit-x {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            color: #0ff;
+            font-size: 24px;
+            cursor: pointer;
+            font-weight: bold;
+            padding: 5px;
+            line-height: 1;
+        }
+        .exit-x:hover { color: #fff; }
+
         .close-btn {
             position: absolute;
             top: 20px;
@@ -158,12 +172,20 @@
             cursor: pointer;
             border-radius: 8px;
             font-weight: bold;
+            pointer-events: auto;
+        }
+        
+        .guide-text {
+            color: #888;
+            font-size: 10px;
+            margin-top: 10px;
+            text-transform: uppercase;
         }
     </style>
 </head>
 <body>
 
-<div id="toast">SYSTEM: CAPTURE COMPLETE</div>
+<div id="toast">SYSTEM: ACTION COMPLETE</div>
 
 <div id="data-overlay">
     STAR: MARSHMALLOW^M (TM-41126)<br>
@@ -179,7 +201,8 @@
 </div>
 
 <div id="planet-popup">
-    <div id="planet-icon" style="font-size: 50px; margin-bottom: 5px;">🪐</div>
+    <div class="exit-x" onclick="closePopups()">✕</div>
+    <div id="planet-icon" style="font-size: 50px; margin-bottom: 5px; margin-top: 10px;">🪐</div>
     <h3 id="planet-name"></h3>
     <p id="planet-desc" style="font-size: 14px; color: #aaa; line-height: 1.5;"></p>
     
@@ -187,26 +210,25 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
         TAKE SCREENSHOT
     </button>
-
-    <div class="social-grid">
-        <button class="social-btn" onclick="shareSocial('linkedin')">LinkedIn</button>
-        <button class="social-btn" onclick="shareSocial('instagram')">Instagram</button>
-        <button class="social-btn" onclick="shareSocial('tiktok')" style="grid-column: span 2;">TikTok</button>
-    </div>
 </div>
 
 <div id="screenshot-overlay">
-    <button class="close-btn" onclick="closePreview()">✕ CLOSE</button>
-    <h2 style="color: #0ff; margin-bottom: 15px; letter-spacing: 2px;">LOG ENTRY SAVED</h2>
+    <div class="exit-x" style="top: 20px; right: 25px; font-size: 30px;" onclick="closePopups()">✕</div>
+    <h2 style="color: #0ff; margin-bottom: 15px; letter-spacing: 2px; text-align: center;">LOG ENTRY CAPTURED</h2>
     <img id="preview-img" alt="Planet Screenshot">
     
     <div style="display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 400px;">
-        <button class="share-btn" style="padding: 18px;" onclick="downloadImage()">💾 SAVE TO GALLERY</button>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <button class="share-btn" style="padding: 15px; margin-top: 0; font-size: 12px;" onclick="downloadImage()">💾 SAVE LOG</button>
+            <button class="share-btn" style="padding: 15px; margin-top: 0; font-size: 12px; background: #fff; color: #000;" onclick="copyImageToClipboard()">📋 COPY IMAGE</button>
+        </div>
+        
         <div class="social-grid" style="margin-top: 0;">
             <button class="social-btn" style="background: #0077b5;" onclick="shareSocial('linkedin')">LinkedIn</button>
             <button class="social-btn" style="background: #E1306C;" onclick="shareSocial('instagram')">Instagram</button>
             <button class="social-btn" style="background: #000; border: 1px solid #ff0050; grid-column: span 2;" onclick="shareSocial('tiktok')">Post on TikTok</button>
         </div>
+        <p class="guide-text" style="text-align: center;">1. Copy caption/image & Save log <br> 2. Open app and post your discovery</p>
     </div>
 </div>
 
@@ -221,6 +243,9 @@ const pDesc = document.getElementById("planet-desc");
 const toast = document.getElementById("toast");
 const screenshotOverlay = document.getElementById("screenshot-overlay");
 const previewImg = document.getElementById("preview-img");
+
+let isPaused = false;
+let currentSnapshotBlob = null;
 
 // Physics Constants
 const G_CONSTANT = 0.12; 
@@ -253,9 +278,10 @@ class Controls {
     constructor() {
         this.mouse = { x: 0, y: 0, isDown: false };
         window.addEventListener("mousemove", e => { this.mouse.x = e.clientX; this.mouse.y = e.clientY; });
-        window.addEventListener("mousedown", () => { this.mouse.isDown = true; });
+        window.addEventListener("mousedown", () => { if(!isPaused) this.mouse.isDown = true; });
         window.addEventListener("mouseup", () => { this.mouse.isDown = false; });
         window.addEventListener("touchstart", e => {
+            if(isPaused) return;
             const t = e.touches[0];
             this.mouse.x = t.clientX; this.mouse.y = t.clientY;
             this.mouse.isDown = true;
@@ -295,7 +321,7 @@ class Player {
     }
 
     update(planets, sun) {
-        if (screenshotOverlay.style.display === "flex") return;
+        if (isPaused) return;
 
         const dx = this.controls.mouse.x - canvas.width / 2;
         const dy = this.controls.mouse.y - canvas.height / 2;
@@ -378,7 +404,8 @@ class Player {
         this.particles.forEach(p => p.update());
         this.particles = this.particles.filter(p => p.life > 0);
 
-        document.getElementById("vel").innerText = Math.hypot(this.vx, this.vy).toFixed(1);
+        const currentSpeedVal = Math.hypot(this.vx, this.vy);
+        document.getElementById("vel").innerText = currentSpeedVal.toFixed(1);
         document.getElementById("power").innerText = Math.round(this.thrust * 100) + "%";
         document.getElementById("coord").innerText = `${Math.floor(this.x)},${Math.floor(this.y)}`;
         document.getElementById("bodies-count").innerText = `${claimedCount} / 9`;
@@ -388,6 +415,68 @@ class Player {
         this.particles.forEach(p => p.draw(ctx, camera));
         const shipScreenX = canvas.width / 2;
         const shipScreenY = canvas.height / 2;
+
+        // Visual Guidance System (Interaction Overlay)
+        if (this.controls.mouse.isDown && !isPaused) {
+            // Thrust Intent Vector Line (dashed)
+            ctx.setLineDash([5, 5]);
+            ctx.strokeStyle = "rgba(0, 255, 255, 0.4)";
+            ctx.beginPath();
+            ctx.moveTo(shipScreenX, shipScreenY);
+            ctx.lineTo(this.controls.mouse.x, this.controls.mouse.y);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Target Point Circle
+            ctx.strokeStyle = "#0ff";
+            ctx.beginPath();
+            ctx.arc(this.controls.mouse.x, this.controls.mouse.y, 5 + Math.sin(Date.now()*0.01)*2, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Magnitude Power Ring
+            ctx.strokeStyle = "rgba(0, 255, 255, 0.2)";
+            ctx.beginPath();
+            ctx.arc(shipScreenX, shipScreenY, MAX_THRUST_DIST * this.thrust, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
+        // Persistent Velocity Vector Line
+        const currentSpeed = Math.hypot(this.vx, this.vy);
+        if (currentSpeed > 0.1) {
+            ctx.strokeStyle = "#4da6ff";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(shipScreenX, shipScreenY);
+            // Length scales with velocity
+            const vectorScale = 8;
+            ctx.lineTo(shipScreenX + this.vx * vectorScale, shipScreenY + this.vy * vectorScale);
+            ctx.stroke();
+            
+            // Vector Arrow Head
+            const vAngle = Math.atan2(this.vy, this.vx);
+            ctx.save();
+            ctx.translate(shipScreenX + this.vx * vectorScale, shipScreenY + this.vy * vectorScale);
+            ctx.rotate(vAngle);
+            ctx.fillStyle = "#4da6ff";
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(-6, -3);
+            ctx.lineTo(-6, 3);
+            ctx.fill();
+            ctx.restore();
+            ctx.lineWidth = 1;
+        }
+
+        // Direction Indicator Ring
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+        ctx.beginPath();
+        ctx.arc(shipScreenX, shipScreenY, 25, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        ctx.strokeStyle = "#0ff";
+        ctx.beginPath();
+        ctx.arc(shipScreenX + Math.cos(this.direction) * 25, shipScreenY + Math.sin(this.direction) * 25, 2, 0, Math.PI * 2);
+        ctx.stroke();
 
         ctx.save();
         ctx.translate(shipScreenX, shipScreenY);
@@ -406,6 +495,7 @@ class Player {
 }
 
 function showPlanetData(p) {
+    isPaused = true;
     document.getElementById("planet-icon").innerText = p.icon;
     pName.innerText = p.name;
     pDesc.innerText = p.description;
@@ -429,50 +519,69 @@ function captureAndShow() {
 
         const dataURL = canvas.toDataURL("image/png");
         previewImg.src = dataURL;
+        
+        canvas.toBlob(blob => {
+            currentSnapshotBlob = blob;
+        }, 'image/png');
+
         screenshotOverlay.style.display = "flex";
         
         document.getElementById("hud").style.opacity = "1";
         document.getElementById("data-overlay").style.opacity = "1";
-        showToast("SNAPSHOT READY");
+        showToast("SNAPSHOT GENERATED");
     }, 100);
 }
 
+async function copyImageToClipboard() {
+    if (!currentSnapshotBlob) {
+        showToast("ERROR: NO IMAGE DATA");
+        return;
+    }
+    try {
+        const item = new ClipboardItem({ "image/png": currentSnapshotBlob });
+        await navigator.clipboard.write([item]);
+        showToast("IMAGE COPIED TO CLIPBOARD!");
+    } catch (err) {
+        console.error(err);
+        showToast("CLIPBOARD ACCESS DENIED");
+    }
+}
+
 function shareSocial(platform) {
-    const text = `🚀 I've discovered Planet ${pName.innerText} in DevSoc Space! ${pDesc.innerText} #DevSoc #SpaceExploration`;
     const url = window.location.href;
+    const text = `🚀 I've discovered Planet ${pName.innerText} in DevSoc Space! ${pDesc.innerText}\n\nExplore with me: ${url}\n\n#DevSoc #SpaceExploration`;
     
     if (platform === 'linkedin') {
         const shareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}&summary=${encodeURIComponent(text)}`;
         window.open(shareUrl, '_blank');
+        showToast("PRE-FILLING LINKEDIN...");
     } else if (platform === 'instagram' || platform === 'tiktok') {
-        // Handle clipboard copy for caption
         try {
-            const tempInput = document.createElement("input");
+            const tempInput = document.createElement("textarea");
             tempInput.value = text;
             document.body.appendChild(tempInput);
             tempInput.select();
             document.execCommand("copy");
             document.body.removeChild(tempInput);
-            showToast("CAPTION COPIED & LOG SAVED");
+            showToast("CAPTION & URL COPIED!");
         } catch(e) {}
 
-        downloadImage();
-        
+        const target = platform === 'instagram' ? "https://www.instagram.com/" : "https://www.tiktok.com/upload";
         setTimeout(() => {
-            const target = platform === 'instagram' ? "https://www.instagram.com/" : "https://www.tiktok.com/upload";
             window.open(target, '_blank');
         }, 1200);
     }
 }
 
-function closePreview() {
+function closePopups() {
     screenshotOverlay.style.display = "none";
-    planetPopup.style.display = "block";
+    planetPopup.style.display = "none";
+    isPaused = false;
 }
 
 function downloadImage() {
     const link = document.createElement('a');
-    link.download = `planet_${pName.innerText.toLowerCase()}.png`;
+    link.download = `planet_discovery_${pName.innerText.toLowerCase()}.png`;
     link.href = previewImg.src;
     link.click();
     showToast("LOG SAVED TO GALLERY");
@@ -543,7 +652,7 @@ function drawCosineRings(x, y, radius) {
 }
 
 function update() {
-    if (screenshotOverlay.style.display === "flex") return;
+    if (isPaused) return;
     planets.forEach(p => {
         p.angle += p.speed;
         p.x = sun.x + Math.cos(p.angle) * p.orbitRadius;
