@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Space - Orbital Mechanics</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #0a0a0c; font-family: 'Courier New', Courier, monospace; }
+        canvas { display: block; touch-action: none; }
+        
+        #hud {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+            pointer-events: none;
+            color: #888da8;
+        }
+
+        .stat-box {
+            background: rgba(15, 15, 20, 0.8);
+            border: 1px solid #2a2a35;
+            padding: 10px 15px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-value { color: #fff; font-weight: bold; margin-left: 5px; }
+
+        #data-overlay {
+            position: absolute;
+            top: 40px;
+            left: 40px;
+            color: #888da8;
+            font-size: 12px;
+            line-height: 1.4;
+            pointer-events: none;
+        }
+
+        /* Planet Popup Style */
+        #planet-popup {
+            position: absolute;
+            bottom: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(10,10,15,0.95);
+            border: 1px solid #2a2a35;
+            padding: 20px;
+            width: 260px;
+            color: white;
+            display: none;
+            text-align: center;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            z-index: 100;
+        }
+
+        #planet-popup h3 { margin: 0 0 10px 0; color: #0ff; letter-spacing: 2px; }
+        
+        .share-btn {
+            margin-top: 15px;
+            background: transparent;
+            border: 1px solid #0ff;
+            color: #0ff;
+            padding: 8px 15px;
+            font-family: inherit;
+            cursor: pointer;
+            font-size: 10px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+        }
+        .share-btn:hover { background: #0ff; color: #000; }
+        
+        /* Message toast */
+        #toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 255, 255, 0.1);
+            border: 1px solid #0ff;
+            color: #0ff;
+            padding: 10px 20px;
+            font-size: 12px;
+            border-radius: 4px;
+            display: none;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+
+<div id="toast">SYSTEM: PREPARING TRANSMISSION...</div>
+
+<div id="data-overlay">
+    STAR: MARSHMALLOW^M (TM-41126)<br>
+    STATUS: GRAVITY WELL ACTIVE<br>
+    SENSORS: VECTOR OVERLAY ENABLED<br>
+    BODIES: <span id="bodies-count">0 / 9</span>
+</div>
+
+<div id="hud">
+    <div class="stat-box">VEL:<span id="vel" class="stat-value">0.0</span></div>
+    <div class="stat-box">POWER:<span id="power" class="stat-value">0%</span></div>
+    <div class="stat-box">COORD:<span id="coord" class="stat-value">0,0</span></div>
+</div>
+
+<!-- Planet Information Modal -->
+<div id="planet-popup">
+    <div id="planet-icon" style="font-size: 30px; margin-bottom: 10px;">🪐</div>
+    <h3 id="planet-name"></h3>
+    <p id="planet-desc" style="font-size: 12px; color: #aaa;"></p>
+    <button class="share-btn" onclick="sharePlanet()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13"/></svg>
+        SHARE TO SOCIAL
+    </button>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+const planetPopup = document.getElementById("planet-popup");
+const pName = document.getElementById("planet-name");
+const pDesc = document.getElementById("planet-desc");
+const toast = document.getElementById("toast");
+
+// Physics Constants for Slingshots
+const G_CONSTANT = 0.12; 
+const MAX_THRUST_DIST = 300;
+const MAX_THRUST_FORCE = 0.8;
+const TERMINAL_VELOCITY = 25; 
+const LANDING_SPEED_THRESHOLD = 4.2;
+const BREAKOUT_THRUST_LIMIT = 0.2;
+
+const planetData = [
+    { name: "Java", desc: "Enterprise backend, Spring Boot, APIs", icon: "☕" },
+    { name: "Python", desc: "AI, Data Science, Automation", icon: "🐍" },
+    { name: "JavaScript", desc: "Web apps, frontend, Node.js", icon: "📜" },
+    { name: "C++", desc: "Game engines, performance systems", icon: "⚙️" },
+    { name: "C#", desc: "Unity, enterprise apps, .NET", icon: "🎮" },
+    { name: "Go", desc: "Cloud systems, microservices", icon: "🐹" },
+    { name: "Rust", desc: "Memory safety, systems programming", icon: "🦀" },
+    { name: "Kotlin", desc: "Android development, modern JVM", icon: "📱" },
+    { name: "TypeScript", desc: "Scalable JavaScript apps", icon: "🛡️" }
+];
+
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+class Controls {
+    constructor() {
+        this.mouse = { x: 0, y: 0, isDown: false };
+        window.addEventListener("mousemove", e => { this.mouse.x = e.clientX; this.mouse.y = e.clientY; });
+        window.addEventListener("mousedown", () => { this.mouse.isDown = true; });
+        window.addEventListener("mouseup", () => { this.mouse.isDown = false; });
+        window.addEventListener("touchstart", e => {
+            const t = e.touches[0];
+            this.mouse.x = t.clientX; this.mouse.y = t.clientY;
+            this.mouse.isDown = true;
+        });
+        window.addEventListener("touchend", () => { this.mouse.isDown = false; });
+    }
+}
+
+class Particle {
+    constructor(x, y, vx, vy) {
+        this.x = x; this.y = y;
+        this.vx = vx * 0.4 + (Math.random()-0.5);
+        this.vy = vy * 0.4 + (Math.random()-0.5);
+        this.life = 1.0;
+        this.size = 2 + Math.random() * 4;
+    }
+    update() {
+        this.x += this.vx; this.y += this.vy;
+        this.life -= 0.015;
+    }
+    draw(ctx, camera) {
+        ctx.strokeStyle = `rgba(150, 150, 180, ${this.life * 0.5})`;
+        ctx.beginPath();
+        ctx.arc(this.x - camera.x, this.y - camera.y, this.size, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+}
+
+class Player {
+    constructor(x, y) {
+        this.x = x; this.y = y; this.vx = 0; this.vy = 0;
+        this.radius = 10; this.direction = 0;
+        this.controls = new Controls();
+        this.particles = [];
+        this.thrust = 0;
+        this.landedOn = null; 
+    }
+
+    update(planets, sun) {
+        const dx = this.controls.mouse.x - canvas.width / 2;
+        const dy = this.controls.mouse.y - canvas.height / 2;
+        const dist = Math.hypot(dx, dy);
+        this.direction = Math.atan2(dy, dx);
+
+        if (this.controls.mouse.isDown) {
+            this.thrust = Math.min(dist / MAX_THRUST_DIST, 1);
+            const force = this.thrust * MAX_THRUST_FORCE;
+            
+            this.vx += Math.cos(this.direction) * force;
+            this.vy += Math.sin(this.direction) * force;
+            
+            if (this.landedOn && this.thrust > BREAKOUT_THRUST_LIMIT) {
+                this.landedOn = null;
+                planetPopup.style.display = "none";
+                this.vx += Math.cos(this.direction) * 3.5;
+                this.vy += Math.sin(this.direction) * 3.5;
+            }
+            
+            if (Math.random() > 0.4) {
+                this.particles.push(new Particle(this.x, this.y, -Math.cos(this.direction)*2.5, -Math.sin(this.direction)*2.5));
+            }
+        } else {
+            this.thrust = 0;
+        }
+
+        const bodies = [sun, ...planets];
+        let claimedCount = 0;
+        
+        bodies.forEach(p => {
+            const pdx = p.x - this.x;
+            const pdy = p.y - this.y;
+            const distToBody = Math.hypot(pdx, pdy);
+            const angle = Math.atan2(pdy, pdx);
+
+            if (this.landedOn !== p) {
+                const force = (G_CONSTANT * p.mass) / Math.max(distToBody * distToBody, 400);
+                this.vx += Math.cos(angle) * force;
+                this.vy += Math.sin(angle) * force;
+            }
+
+            const minP = this.radius + p.radius;
+            if (distToBody < minP) {
+                const currentSpeed = Math.hypot(this.vx, this.vy);
+                const nx = pdx / distToBody; const ny = pdy / distToBody;
+                
+                if (currentSpeed < LANDING_SPEED_THRESHOLD && p.id !== 'sun') {
+                    if (!this.landedOn) {
+                        this.landedOn = p;
+                        p.hasFlag = true;
+                        this.vx = 0;
+                        this.vy = 0;
+                        showPlanetData(p);
+                    }
+                } else if (this.landedOn !== p) {
+                    this.x = p.x - nx * minP;
+                    this.y = p.y - ny * minP;
+                    const dot = this.vx * nx + this.vy * ny;
+                    this.vx = (this.vx - 2 * dot * nx) * 0.3;
+                    this.vy = (this.vy - 2 * dot * ny) * 0.3;
+                }
+            }
+            if (p.hasFlag) claimedCount++;
+        });
+
+        if (this.landedOn) {
+            const p = this.landedOn;
+            const angleToBody = Math.atan2(this.y - p.y, this.x - p.x);
+            const surfaceDist = p.radius + this.radius;
+            this.x = p.x + Math.cos(angleToBody) * surfaceDist;
+            this.y = p.y + Math.sin(angleToBody) * surfaceDist;
+        } else {
+            this.x += this.vx;
+            this.y += this.vy;
+            
+            const currentSpeed = Math.hypot(this.vx, this.vy);
+            if (currentSpeed > TERMINAL_VELOCITY) {
+                this.vx *= 0.98;
+                this.vy *= 0.98;
+            }
+        }
+
+        this.particles.forEach(p => p.update());
+        this.particles = this.particles.filter(p => p.life > 0);
+
+        document.getElementById("vel").innerText = Math.hypot(this.vx, this.vy).toFixed(1);
+        document.getElementById("power").innerText = Math.round(this.thrust * 100) + "%";
+        document.getElementById("coord").innerText = `${Math.floor(this.x)},${Math.floor(this.y)}`;
+        document.getElementById("bodies-count").innerText = `${claimedCount} / 9`;
+    }
+
+    draw(ctx, camera) {
+        this.particles.forEach(p => p.draw(ctx, camera));
+        
+        const shipScreenX = canvas.width / 2;
+        const shipScreenY = canvas.height / 2;
+
+        if (this.controls.mouse.isDown) {
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(shipScreenX, shipScreenY, MAX_THRUST_DIST, 0, Math.PI * 2);
+            ctx.stroke();
+
+            const targetX = this.controls.mouse.x;
+            const targetY = this.controls.mouse.y;
+            const dx = targetX - shipScreenX;
+            const dy = targetY - shipScreenY;
+            const dist = Math.hypot(dx, dy);
+            
+            const constrainedDist = Math.min(dist, MAX_THRUST_DIST);
+            const visualX = shipScreenX + Math.cos(this.direction) * constrainedDist;
+            const visualY = shipScreenY + Math.sin(this.direction) * constrainedDist;
+
+            ctx.strokeStyle = "rgba(0, 255, 255, 0.4)";
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(shipScreenX, shipScreenY);
+            ctx.lineTo(visualX, visualY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            ctx.fillStyle = "#0ff";
+            ctx.beginPath();
+            ctx.arc(visualX, visualY, 3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        const speed = Math.hypot(this.vx, this.vy);
+        if (speed > 0.1) {
+            const vectorLen = speed * 15;
+            const velX = shipScreenX + (this.vx / speed) * vectorLen;
+            const velY = shipScreenY + (this.vy / speed) * vectorLen;
+
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(shipScreenX, shipScreenY);
+            ctx.lineTo(velX, velY);
+            ctx.stroke();
+
+            const angle = Math.atan2(this.vy, this.vx);
+            ctx.beginPath();
+            ctx.moveTo(velX, velY);
+            ctx.lineTo(velX - 6 * Math.cos(angle - 0.5), velY - 6 * Math.sin(angle - 0.5));
+            ctx.moveTo(velX, velY);
+            ctx.lineTo(velX - 6 * Math.cos(angle + 0.5), velY - 6 * Math.sin(angle + 0.5));
+            ctx.stroke();
+        }
+
+        ctx.save();
+        ctx.translate(shipScreenX, shipScreenY);
+        ctx.rotate(this.direction + Math.PI / 2);
+        
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, 8, Math.PI, 0); 
+        ctx.lineTo(8, 10);
+        ctx.lineTo(-8, 10);
+        ctx.closePath();
+        ctx.stroke();
+
+        ctx.fillStyle = this.thrust > 0 ? "#0ff" : (this.landedOn ? "#0f0" : "#333");
+        ctx.fillRect(-2, 4, 4, 4);
+        ctx.restore();
+    }
+}
+
+function showPlanetData(p) {
+    document.getElementById("planet-icon").innerText = p.icon;
+    pName.innerText = p.name;
+    pDesc.innerText = p.description;
+    planetPopup.style.display = "block";
+}
+
+async function sharePlanet() {
+    const currentPlanet = pName.innerText;
+    const currentDesc = pDesc.innerText;
+    
+    // Preparation message
+    toast.style.display = "block";
+    toast.innerText = "SYSTEM: CAPTURING SECTOR...";
+    
+    // Capture canvas as a blob
+    canvas.toBlob(async (blob) => {
+        if (!blob) {
+            toast.innerText = "ERROR: CAPTURE FAILED";
+            return;
+        }
+
+        const fileName = `exploration_${currentPlanet.toLowerCase()}.png`;
+        const file = new File([blob], fileName, { type: 'image/png' });
+        
+        // Use Web Share API if available (Mobile support)
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            try {
+                await navigator.share({
+                    files: [file],
+                    title: `Sector Discovery: ${currentPlanet}`,
+                    text: `I just landed on Planet ${currentPlanet}! Fact: ${currentDesc} #SpaceExplorer #DevSoc`,
+                });
+                toast.innerText = "TRANSMISSION SUCCESSFUL";
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    toast.innerText = "TRANSMISSION FAILED";
+                }
+            }
+        } else {
+            // Fallback for desktop: Download
+            const dataURL = canvas.toDataURL("image/png");
+            const link = document.createElement('a');
+            link.download = fileName;
+            link.href = dataURL;
+            link.click();
+            toast.innerText = "TRANSMISSION SAVED TO DISK";
+        }
+        
+        setTimeout(() => { toast.style.display = "none"; }, 3000);
+    });
+}
+
+/* ================= INIT ================= */
+const sun = { x: 0, y: 0, radius: 110, mass: 65000, color: "#ff4d00", id: 'sun' };
+const planets = [];
+const planetColors = ["#555", "#8a6", "#46a", "#a44", "#a84", "#68a", "#84a", "#4a8", "#666"];
+
+for (let i = 0; i < 9; i++) {
+    planets.push({
+        orbitRadius: 800 + i * 450,
+        angle: Math.random() * Math.PI * 2,
+        speed: 0.0015 / (i + 1),
+        radius: 14 + i * 4,
+        mass: 6000 + i * 3000,
+        color: planetColors[i],
+        hasFlag: false,
+        x: 0, y: 0,
+        id: 'p' + i,
+        // Programming Data
+        name: planetData[i].name,
+        description: planetData[i].desc,
+        icon: planetData[i].icon
+    });
+}
+
+const player = new Player(0, -900);
+
+function drawGrid(camera) {
+    const size = 300;
+    ctx.strokeStyle = "#121218";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = -camera.x % size; x < canvas.width; x += size) {
+        ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height);
+    }
+    for (let y = -camera.y % size; y < canvas.height; y += size) {
+        ctx.moveTo(0, y); ctx.lineTo(canvas.width, y);
+    }
+    ctx.stroke();
+}
+
+function drawCosineRings(x, y, radius) {
+    const time = Date.now() * 0.0015;
+    ctx.lineWidth = 1;
+    
+    for (let i = 0; i < 5; i++) {
+        const baseRadius = radius + 25 + i * 35;
+        const opacity = 0.35 - i * 0.06;
+        ctx.strokeStyle = `rgba(255, 90, 0, ${opacity})`;
+        
+        ctx.beginPath();
+        for (let a = 0; a < Math.PI * 2; a += 0.05) {
+            const wave = Math.cos(a * 12 + time + i) * (6 + i * 2);
+            const r = baseRadius + wave;
+            const px = x + Math.cos(a) * r;
+            const py = y + Math.sin(a) * r;
+            if (a === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.stroke();
+    }
+}
+
+function update() {
+    planets.forEach(p => {
+        p.angle += p.speed;
+        p.x = sun.x + Math.cos(p.angle) * p.orbitRadius;
+        p.y = sun.y + Math.sin(p.angle) * p.orbitRadius;
+    });
+    player.update(planets, sun);
+}
+
+function draw() {
+    ctx.fillStyle = "#0a0a0c";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const camera = { x: player.x - canvas.width / 2, y: player.y - canvas.height / 2 };
+
+    drawGrid(camera);
+
+    ctx.setLineDash([2, 10]);
+    ctx.strokeStyle = "#1a1c24";
+    planets.forEach(p => {
+        ctx.beginPath();
+        ctx.arc(sun.x - camera.x, sun.y - camera.y, p.orbitRadius, 0, Math.PI * 2);
+        ctx.stroke();
+    });
+    ctx.setLineDash([]);
+
+    const sunX = sun.x - camera.x;
+    const sunY = sun.y - camera.y;
+    drawCosineRings(sunX, sunY, sun.radius);
+    
+    const gradient = ctx.createRadialGradient(sunX, sunY, sun.radius * 0.5, sunX, sunY, sun.radius);
+    gradient.addColorStop(0, "#ff9d00");
+    gradient.addColorStop(1, "#ff4d00");
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, sun.radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    planets.forEach(b => {
+        const x = b.x - camera.x;
+        const y = b.y - camera.y;
+
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+        ctx.beginPath();
+        ctx.arc(x, y, b.radius + 10, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.fillStyle = b.color;
+        ctx.beginPath();
+        ctx.arc(x, y, b.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Label
+        ctx.fillStyle = "#aaa";
+        ctx.font = "10px Courier New";
+        ctx.textAlign = "center";
+        ctx.fillText(b.name.toUpperCase(), x, y + b.radius + 20);
+
+        if (b.hasFlag) {
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(x, y - b.radius);
+            ctx.lineTo(x, y - b.radius - 14);
+            ctx.lineTo(x + 10, y - b.radius - 10);
+            ctx.lineTo(x, y - b.radius - 6);
+            ctx.stroke();
+        }
+    });
+
+    player.draw(ctx, camera);
+}
+
+function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+window.onload = loop;
+</script>
+
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Space - Orbital Mechanics</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #0a0a0c; font-family: 'Courier New', Courier, monospace; }
+        canvas { display: block; touch-action: none; }
+        
+        #hud {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+            pointer-events: none;
+            color: #888da8;
+        }
+
+        .stat-box {
+            background: rgba(15, 15, 20, 0.8);
+            border: 1px solid #2a2a35;
+            padding: 10px 15px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-value { color: #fff; font-weight: bold; margin-left: 5px; }
+
+        #data-overlay {
+            position: absolute;
+            top: 40px;
+            left: 40px;
+            color: #888da8;
+            font-size: 12px;
+            line-height: 1.4;
+            pointer-events: none;
+        }
+
+        /* Planet Popup Style */
+        #planet-popup {
+            position: absolute;
+            bottom: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(10,10,15,0.95);
+            border: 1px solid #2a2a35;
+            padding: 20px;
+            width: 260px;
+            color: white;
+            display: none;
+            text-align: center;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            z-index: 100;
+        }
+
+        #planet-popup h3 { margin: 0 0 10px 0; color: #0ff; letter-spacing: 2px; }
+        
+        .share-btn {
+            margin-top: 15px;
+            background: transparent;
+            border: 1px solid #0ff;
+            color: #0ff;
+            padding: 8px 15px;
+            font-family: inherit;
+            cursor: pointer;
+            font-size: 10px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+        }
+        .share-btn:hover { background: #0ff; color: #000; }
+        
+        /* Message toast */
+        #toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 255, 255, 0.1);
+            border: 1px solid #0ff;
+            color: #0ff;
+            padding: 10px 20px;
+            font-size: 12px;
+            border-radius: 4px;
+            display: none;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+
+<div id="toast">SYSTEM: PREPARING TRANSMISSION...</div>
+
+<div id="data-overlay">
+    STAR: MARSHMALLOW^M (TM-41126)<br>
+    STATUS: GRAVITY WELL ACTIVE<br>
+    SENSORS: VECTOR OVERLAY ENABLED<br>
+    BODIES: <span id="bodies-count">0 / 9</span>
+</div>
+
+<div id="hud">
+    <div class="stat-box">VEL:<span id="vel" class="stat-value">0.0</span></div>
+    <div class="stat-box">POWER:<span id="power" class="stat-value">0%</span></div>
+    <div class="stat-box">COORD:<span id="coord" class="stat-value">0,0</span></div>
+</div>
+
+<!-- Planet Information Modal -->
+<div id="planet-popup">
+    <div id="planet-icon" style="font-size: 30px; margin-bottom: 10px;">🪐</div>
+    <h3 id="planet-name"></h3>
+    <p id="planet-desc" style="font-size: 12px; color: #aaa;"></p>
+    <button class="share-btn" onclick="sharePlanet()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13"/></svg>
+        SHARE TO SOCIAL
+    </button>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+const planetPopup = document.getElementById("planet-popup");
+const pName = document.getElementById("planet-name");
+const pDesc = document.getElementById("planet-desc");
+const toast = document.getElementById("toast");
+
+// Physics Constants for Slingshots
+const G_CONSTANT = 0.12; 
+const MAX_THRUST_DIST = 300;
+const MAX_THRUST_FORCE = 0.8;
+const TERMINAL_VELOCITY = 25; 
+const LANDING_SPEED_THRESHOLD = 4.2;
+const BREAKOUT_THRUST_LIMIT = 0.2;
+
+const planetData = [
+    { name: "Java", desc: "Enterprise backend, Spring Boot, APIs", icon: "☕" },
+    { name: "Python", desc: "AI, Data Science, Automation", icon: "🐍" },
+    { name: "JavaScript", desc: "Web apps, frontend, Node.js", icon: "📜" },
+    { name: "C++", desc: "Game engines, performance systems", icon: "⚙️" },
+    { name: "C#", desc: "Unity, enterprise apps, .NET", icon: "🎮" },
+    { name: "Go", desc: "Cloud systems, microservices", icon: "🐹" },
+    { name: "Rust", desc: "Memory safety, systems programming", icon: "🦀" },
+    { name: "Kotlin", desc: "Android development, modern JVM", icon: "📱" },
+    { name: "TypeScript", desc: "Scalable JavaScript apps", icon: "🛡️" }
+];
+
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+class Controls {
+    constructor() {
+        this.mouse = { x: 0, y: 0, isDown: false };
+        window.addEventListener("mousemove", e => { this.mouse.x = e.clientX; this.mouse.y = e.clientY; });
+        window.addEventListener("mousedown", () => { this.mouse.isDown = true; });
+        window.addEventListener("mouseup", () => { this.mouse.isDown = false; });
+        window.addEventListener("touchstart", e => {
+            const t = e.touches[0];
+            this.mouse.x = t.clientX; this.mouse.y = t.clientY;
+            this.mouse.isDown = true;
+        });
+        window.addEventListener("touchend", () => { this.mouse.isDown = false; });
+    }
+}
+
+class Particle {
+    constructor(x, y, vx, vy) {
+        this.x = x; this.y = y;
+        this.vx = vx * 0.4 + (Math.random()-0.5);
+        this.vy = vy * 0.4 + (Math.random()-0.5);
+        this.life = 1.0;
+        this.size = 2 + Math.random() * 4;
+    }
+    update() {
+        this.x += this.vx; this.y += this.vy;
+        this.life -= 0.015;
+    }
+    draw(ctx, camera) {
+        ctx.strokeStyle = `rgba(150, 150, 180, ${this.life * 0.5})`;
+        ctx.beginPath();
+        ctx.arc(this.x - camera.x, this.y - camera.y, this.size, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+}
+
+class Player {
+    constructor(x, y) {
+        this.x = x; this.y = y; this.vx = 0; this.vy = 0;
+        this.radius = 10; this.direction = 0;
+        this.controls = new Controls();
+        this.particles = [];
+        this.thrust = 0;
+        this.landedOn = null; 
+    }
+
+    update(planets, sun) {
+        const dx = this.controls.mouse.x - canvas.width / 2;
+        const dy = this.controls.mouse.y - canvas.height / 2;
+        const dist = Math.hypot(dx, dy);
+        this.direction = Math.atan2(dy, dx);
+
+        if (this.controls.mouse.isDown) {
+            this.thrust = Math.min(dist / MAX_THRUST_DIST, 1);
+            const force = this.thrust * MAX_THRUST_FORCE;
+            
+            this.vx += Math.cos(this.direction) * force;
+            this.vy += Math.sin(this.direction) * force;
+            
+            if (this.landedOn && this.thrust > BREAKOUT_THRUST_LIMIT) {
+                this.landedOn = null;
+                planetPopup.style.display = "none";
+                this.vx += Math.cos(this.direction) * 3.5;
+                this.vy += Math.sin(this.direction) * 3.5;
+            }
+            
+            if (Math.random() > 0.4) {
+                this.particles.push(new Particle(this.x, this.y, -Math.cos(this.direction)*2.5, -Math.sin(this.direction)*2.5));
+            }
+        } else {
+            this.thrust = 0;
+        }
+
+        const bodies = [sun, ...planets];
+        let claimedCount = 0;
+        
+        bodies.forEach(p => {
+            const pdx = p.x - this.x;
+            const pdy = p.y - this.y;
+            const distToBody = Math.hypot(pdx, pdy);
+            const angle = Math.atan2(pdy, pdx);
+
+            if (this.landedOn !== p) {
+                const force = (G_CONSTANT * p.mass) / Math.max(distToBody * distToBody, 400);
+                this.vx += Math.cos(angle) * force;
+                this.vy += Math.sin(angle) * force;
+            }
+
+            const minP = this.radius + p.radius;
+            if (distToBody < minP) {
+                const currentSpeed = Math.hypot(this.vx, this.vy);
+                const nx = pdx / distToBody; const ny = pdy / distToBody;
+                
+                if (currentSpeed < LANDING_SPEED_THRESHOLD && p.id !== 'sun') {
+                    if (!this.landedOn) {
+                        this.landedOn = p;
+                        p.hasFlag = true;
+                        this.vx = 0;
+                        this.vy = 0;
+                        showPlanetData(p);
+                    }
+                } else if (this.landedOn !== p) {
+                    this.x = p.x - nx * minP;
+                    this.y = p.y - ny * minP;
+                    const dot = this.vx * nx + this.vy * ny;
+                    this.vx = (this.vx - 2 * dot * nx) * 0.3;
+                    this.vy = (this.vy - 2 * dot * ny) * 0.3;
+                }
+            }
+            if (p.hasFlag) claimedCount++;
+        });
+
+        if (this.landedOn) {
+            const p = this.landedOn;
+            const angleToBody = Math.atan2(this.y - p.y, this.x - p.x);
+            const surfaceDist = p.radius + this.radius;
+            this.x = p.x + Math.cos(angleToBody) * surfaceDist;
+            this.y = p.y + Math.sin(angleToBody) * surfaceDist;
+        } else {
+            this.x += this.vx;
+            this.y += this.vy;
+            
+            const currentSpeed = Math.hypot(this.vx, this.vy);
+            if (currentSpeed > TERMINAL_VELOCITY) {
+                this.vx *= 0.98;
+                this.vy *= 0.98;
+            }
+        }
+
+        this.particles.forEach(p => p.update());
+        this.particles = this.particles.filter(p => p.life > 0);
+
+        document.getElementById("vel").innerText = Math.hypot(this.vx, this.vy).toFixed(1);
+        document.getElementById("power").innerText = Math.round(this.thrust * 100) + "%";
+        document.getElementById("coord").innerText = `${Math.floor(this.x)},${Math.floor(this.y)}`;
+        document.getElementById("bodies-count").innerText = `${claimedCount} / 9`;
+    }
+
+    draw(ctx, camera) {
+        this.particles.forEach(p => p.draw(ctx, camera));
+        
+        const shipScreenX = canvas.width / 2;
+        const shipScreenY = canvas.height / 2;
+
+        if (this.controls.mouse.isDown) {
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(shipScreenX, shipScreenY, MAX_THRUST_DIST, 0, Math.PI * 2);
+            ctx.stroke();
+
+            const targetX = this.controls.mouse.x;
+            const targetY = this.controls.mouse.y;
+            const dx = targetX - shipScreenX;
+            const dy = targetY - shipScreenY;
+            const dist = Math.hypot(dx, dy);
+            
+            const constrainedDist = Math.min(dist, MAX_THRUST_DIST);
+            const visualX = shipScreenX + Math.cos(this.direction) * constrainedDist;
+            const visualY = shipScreenY + Math.sin(this.direction) * constrainedDist;
+
+            ctx.strokeStyle = "rgba(0, 255, 255, 0.4)";
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(shipScreenX, shipScreenY);
+            ctx.lineTo(visualX, visualY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            ctx.fillStyle = "#0ff";
+            ctx.beginPath();
+            ctx.arc(visualX, visualY, 3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        const speed = Math.hypot(this.vx, this.vy);
+        if (speed > 0.1) {
+            const vectorLen = speed * 15;
+            const velX = shipScreenX + (this.vx / speed) * vectorLen;
+            const velY = shipScreenY + (this.vy / speed) * vectorLen;
+
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(shipScreenX, shipScreenY);
+            ctx.lineTo(velX, velY);
+            ctx.stroke();
+
+            const angle = Math.atan2(this.vy, this.vx);
+            ctx.beginPath();
+            ctx.moveTo(velX, velY);
+            ctx.lineTo(velX - 6 * Math.cos(angle - 0.5), velY - 6 * Math.sin(angle - 0.5));
+            ctx.moveTo(velX, velY);
+            ctx.lineTo(velX - 6 * Math.cos(angle + 0.5), velY - 6 * Math.sin(angle + 0.5));
+            ctx.stroke();
+        }
+
+        ctx.save();
+        ctx.translate(shipScreenX, shipScreenY);
+        ctx.rotate(this.direction + Math.PI / 2);
+        
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, 8, Math.PI, 0); 
+        ctx.lineTo(8, 10);
+        ctx.lineTo(-8, 10);
+        ctx.closePath();
+        ctx.stroke();
+
+        ctx.fillStyle = this.thrust > 0 ? "#0ff" : (this.landedOn ? "#0f0" : "#333");
+        ctx.fillRect(-2, 4, 4, 4);
+        ctx.restore();
+    }
+}
+
+function showPlanetData(p) {
+    document.getElementById("planet-icon").innerText = p.icon;
+    pName.innerText = p.name;
+    pDesc.innerText = p.description;
+    planetPopup.style.display = "block";
+}
+
+async function sharePlanet() {
+    const currentPlanet = pName.innerText;
+    const currentDesc = pDesc.innerText;
+    
+    // Preparation message
+    toast.style.display = "block";
+    toast.innerText = "SYSTEM: CAPTURING SECTOR...";
+    
+    // Capture canvas as a blob
+    canvas.toBlob(async (blob) => {
+        if (!blob) {
+            toast.innerText = "ERROR: CAPTURE FAILED";
+            return;
+        }
+
+        const fileName = `exploration_${currentPlanet.toLowerCase()}.png`;
+        const file = new File([blob], fileName, { type: 'image/png' });
+        
+        // Use Web Share API if available (Mobile support)
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            try {
+                await navigator.share({
+                    files: [file],
+                    title: `Sector Discovery: ${currentPlanet}`,
+                    text: `I just landed on Planet ${currentPlanet}! Fact: ${currentDesc} #SpaceExplorer #DevSoc`,
+                });
+                toast.innerText = "TRANSMISSION SUCCESSFUL";
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    toast.innerText = "TRANSMISSION FAILED";
+                }
+            }
+        } else {
+            // Fallback for desktop: Download
+            const dataURL = canvas.toDataURL("image/png");
+            const link = document.createElement('a');
+            link.download = fileName;
+            link.href = dataURL;
+            link.click();
+            toast.innerText = "TRANSMISSION SAVED TO DISK";
+        }
+        
+        setTimeout(() => { toast.style.display = "none"; }, 3000);
+    });
+}
+
+/* ================= INIT ================= */
+const sun = { x: 0, y: 0, radius: 110, mass: 65000, color: "#ff4d00", id: 'sun' };
+const planets = [];
+const planetColors = ["#555", "#8a6", "#46a", "#a44", "#a84", "#68a", "#84a", "#4a8", "#666"];
+
+for (let i = 0; i < 9; i++) {
+    planets.push({
+        orbitRadius: 800 + i * 450,
+        angle: Math.random() * Math.PI * 2,
+        speed: 0.0015 / (i + 1),
+        radius: 14 + i * 4,
+        mass: 6000 + i * 3000,
+        color: planetColors[i],
+        hasFlag: false,
+        x: 0, y: 0,
+        id: 'p' + i,
+        // Programming Data
+        name: planetData[i].name,
+        description: planetData[i].desc,
+        icon: planetData[i].icon
+    });
+}
+
+const player = new Player(0, -900);
+
+function drawGrid(camera) {
+    const size = 300;
+    ctx.strokeStyle = "#121218";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = -camera.x % size; x < canvas.width; x += size) {
+        ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height);
+    }
+    for (let y = -camera.y % size; y < canvas.height; y += size) {
+        ctx.moveTo(0, y); ctx.lineTo(canvas.width, y);
+    }
+    ctx.stroke();
+}
+
+function drawCosineRings(x, y, radius) {
+    const time = Date.now() * 0.0015;
+    ctx.lineWidth = 1;
+    
+    for (let i = 0; i < 5; i++) {
+        const baseRadius = radius + 25 + i * 35;
+        const opacity = 0.35 - i * 0.06;
+        ctx.strokeStyle = `rgba(255, 90, 0, ${opacity})`;
+        
+        ctx.beginPath();
+        for (let a = 0; a < Math.PI * 2; a += 0.05) {
+            const wave = Math.cos(a * 12 + time + i) * (6 + i * 2);
+            const r = baseRadius + wave;
+            const px = x + Math.cos(a) * r;
+            const py = y + Math.sin(a) * r;
+            if (a === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.stroke();
+    }
+}
+
+function update() {
+    planets.forEach(p => {
+        p.angle += p.speed;
+        p.x = sun.x + Math.cos(p.angle) * p.orbitRadius;
+        p.y = sun.y + Math.sin(p.angle) * p.orbitRadius;
+    });
+    player.update(planets, sun);
+}
+
+function draw() {
+    ctx.fillStyle = "#0a0a0c";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const camera = { x: player.x - canvas.width / 2, y: player.y - canvas.height / 2 };
+
+    drawGrid(camera);
+
+    ctx.setLineDash([2, 10]);
+    ctx.strokeStyle = "#1a1c24";
+    planets.forEach(p => {
+        ctx.beginPath();
+        ctx.arc(sun.x - camera.x, sun.y - camera.y, p.orbitRadius, 0, Math.PI * 2);
+        ctx.stroke();
+    });
+    ctx.setLineDash([]);
+
+    const sunX = sun.x - camera.x;
+    const sunY = sun.y - camera.y;
+    drawCosineRings(sunX, sunY, sun.radius);
+    
+    const gradient = ctx.createRadialGradient(sunX, sunY, sun.radius * 0.5, sunX, sunY, sun.radius);
+    gradient.addColorStop(0, "#ff9d00");
+    gradient.addColorStop(1, "#ff4d00");
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, sun.radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    planets.forEach(b => {
+        const x = b.x - camera.x;
+        const y = b.y - camera.y;
+
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+        ctx.beginPath();
+        ctx.arc(x, y, b.radius + 10, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.fillStyle = b.color;
+        ctx.beginPath();
+        ctx.arc(x, y, b.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Label
+        ctx.fillStyle = "#aaa";
+        ctx.font = "10px Courier New";
+        ctx.textAlign = "center";
+        ctx.fillText(b.name.toUpperCase(), x, y + b.radius + 20);
+
+        if (b.hasFlag) {
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(x, y - b.radius);
+            ctx.lineTo(x, y - b.radius - 14);
+            ctx.lineTo(x + 10, y - b.radius - 10);
+            ctx.lineTo(x, y - b.radius - 6);
+            ctx.stroke();
+        }
+    });
+
+    player.draw(ctx, camera);
+}
+
+function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+window.onload = loop;
+</script>
+
+</body>
+</html>
