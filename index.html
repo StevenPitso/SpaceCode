@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Space - Orbital Mechanics _2</title>
+    <title>Space - Orbital Mechanics</title>
     <style>
         body { margin: 0; overflow: hidden; background: #0a0a0c; font-family: 'Courier New', Courier, monospace; }
         canvas { display: block; touch-action: none; }
@@ -13,6 +13,7 @@
             color: #888da8;
             pointer-events: none;
             transition: opacity 0.3s;
+            z-index: 10;
         }
 
         #hud {
@@ -35,72 +36,83 @@
         .stat-value { color: #fff; font-weight: bold; margin-left: 5px; }
 
         #data-overlay {
-            top: 40px;
-            left: 40px;
-            font-size: 12px;
+            bottom: 30px;
+            left: 30px;
+            font-size: 11px;
             line-height: 1.4;
         }
 
         #planet-popup {
             position: absolute;
-            bottom: 120px;
+            top: 20px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(10,10,15,0.95);
-            border: 1px solid #2a2a35;
-            padding: 20px;
-            width: 260px;
+            background: rgba(10, 10, 15, 0.95);
+            border: 2px solid #0ff;
+            padding: 25px;
+            width: 90%;
+            max-width: 400px;
             color: white;
             display: none;
             text-align: center;
-            border-radius: 8px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border-radius: 12px;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.2);
             z-index: 100;
         }
 
-        #planet-popup h3 { margin: 0 0 10px 0; color: #0ff; letter-spacing: 2px; }
+        #planet-popup h3 { 
+            margin: 10px 0; 
+            color: #0ff; 
+            letter-spacing: 3px; 
+            font-size: 24px;
+        }
         
         .share-btn {
-            margin-top: 10px;
+            margin-top: 15px;
             background: #0ff;
             border: none;
             color: #000;
-            padding: 10px 15px;
+            padding: 18px 25px;
             font-family: inherit;
             cursor: pointer;
-            font-size: 11px;
-            font-weight: bold;
+            font-size: 14px;
+            font-weight: 900;
             transition: all 0.2s;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
+            gap: 12px;
             width: 100%;
-            border-radius: 4px;
+            border-radius: 8px;
+            text-transform: uppercase;
         }
+
+        .share-btn:active { transform: scale(0.95); background: #fff; }
 
         .social-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 8px;
-            margin-top: 8px;
+            gap: 12px;
+            margin-top: 12px;
         }
 
         .social-btn {
-            padding: 8px;
-            font-size: 10px;
+            padding: 15px;
+            font-size: 11px;
+            font-weight: bold;
             background: #2a2a35;
             color: white;
             border: 1px solid #444;
-            border-radius: 4px;
+            border-radius: 8px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 5px;
+            gap: 8px;
+            text-transform: uppercase;
         }
 
-        .social-btn:hover { background: #3a3a45; }
+        .social-btn:active { background: #444; }
         
         #toast {
             position: fixed;
@@ -108,18 +120,19 @@
             right: 20px;
             background: #0ff;
             color: #000;
-            padding: 10px 20px;
-            font-size: 12px;
+            padding: 15px 25px;
+            font-size: 13px;
             font-weight: bold;
-            border-radius: 4px;
+            border-radius: 6px;
             display: none;
-            z-index: 1000;
+            z-index: 3000;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
         }
 
         #screenshot-overlay {
             position: fixed;
             inset: 0;
-            background: rgba(0,0,0,0.9);
+            background: rgba(0,0,0,0.95);
             display: none;
             flex-direction: column;
             align-items: center;
@@ -128,10 +141,10 @@
             padding: 20px;
         }
         #preview-img {
-            max-width: 90%;
-            max-height: 60%;
-            border: 2px solid #0ff;
-            border-radius: 8px;
+            max-width: 100%;
+            max-height: 45%;
+            border: 3px solid #0ff;
+            border-radius: 12px;
             margin-bottom: 20px;
         }
         .close-btn {
@@ -139,10 +152,12 @@
             top: 20px;
             right: 20px;
             color: #fff;
-            background: none;
+            background: rgba(255,255,255,0.1);
             border: 1px solid #fff;
-            padding: 5px 15px;
+            padding: 12px 20px;
             cursor: pointer;
+            border-radius: 8px;
+            font-weight: bold;
         }
     </style>
 </head>
@@ -164,32 +179,34 @@
 </div>
 
 <div id="planet-popup">
-    <div id="planet-icon" style="font-size: 30px; margin-bottom: 10px;">🪐</div>
+    <div id="planet-icon" style="font-size: 50px; margin-bottom: 5px;">🪐</div>
     <h3 id="planet-name"></h3>
-    <p id="planet-desc" style="font-size: 12px; color: #aaa;"></p>
+    <p id="planet-desc" style="font-size: 14px; color: #aaa; line-height: 1.5;"></p>
     
     <button class="share-btn" onclick="captureAndShow()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-        PREPARE SCREENSHOT
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        TAKE SCREENSHOT
     </button>
 
     <div class="social-grid">
-        <button class="social-btn" onclick="shareSocial('whatsapp')">WhatsApp</button>
-        <button class="social-btn" onclick="shareSocial('facebook')">Facebook</button>
+        <button class="social-btn" onclick="shareSocial('linkedin')">LinkedIn</button>
+        <button class="social-btn" onclick="shareSocial('instagram')">Instagram</button>
+        <button class="social-btn" onclick="shareSocial('tiktok')" style="grid-column: span 2;">TikTok</button>
     </div>
 </div>
 
 <div id="screenshot-overlay">
     <button class="close-btn" onclick="closePreview()">✕ CLOSE</button>
-    <h2 style="color: #0ff; margin-bottom: 10px;">SECTOR DISCOVERED</h2>
+    <h2 style="color: #0ff; margin-bottom: 15px; letter-spacing: 2px;">LOG ENTRY SAVED</h2>
     <img id="preview-img" alt="Planet Screenshot">
-    <p style="color: #fff; text-align: center; margin-bottom: 20px; font-size: 13px;">
-        1. Click Download to save image.<br>
-        2. Open your social app manually or use buttons below!
-    </p>
-    <div style="display: flex; gap: 10px;">
-        <button class="share-btn" style="width: auto; padding: 12px 20px;" onclick="downloadImage()">💾 DOWNLOAD</button>
-        <button class="share-btn" style="width: auto; padding: 12px 20px; background: #25D366; color: white;" onclick="shareSocial('whatsapp')">Open WhatsApp</button>
+    
+    <div style="display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 400px;">
+        <button class="share-btn" style="padding: 18px;" onclick="downloadImage()">💾 SAVE TO GALLERY</button>
+        <div class="social-grid" style="margin-top: 0;">
+            <button class="social-btn" style="background: #0077b5;" onclick="shareSocial('linkedin')">LinkedIn</button>
+            <button class="social-btn" style="background: #E1306C;" onclick="shareSocial('instagram')">Instagram</button>
+            <button class="social-btn" style="background: #000; border: 1px solid #ff0050; grid-column: span 2;" onclick="shareSocial('tiktok')">Post on TikTok</button>
+        </div>
     </div>
 </div>
 
@@ -214,15 +231,15 @@ const LANDING_SPEED_THRESHOLD = 4.2;
 const BREAKOUT_THRUST_LIMIT = 0.2;
 
 const planetData = [
-    { name: "Java", desc: "Enterprise backend, Spring Boot, APIs", icon: "☕" },
-    { name: "Python", desc: "AI, Data Science, Automation", icon: "🐍" },
-    { name: "JavaScript", desc: "Web apps, frontend, Node.js", icon: "📜" },
-    { name: "C++", desc: "Game engines, performance systems", icon: "⚙️" },
-    { name: "C#", desc: "Unity, enterprise apps, .NET", icon: "🎮" },
-    { name: "Go", desc: "Cloud systems, microservices", icon: "🐹" },
-    { name: "Rust", desc: "Memory safety, systems programming", icon: "🦀" },
-    { name: "Kotlin", desc: "Android development, modern JVM", icon: "📱" },
-    { name: "TypeScript", desc: "Scalable JavaScript apps", icon: "🛡️" }
+    { name: "Java", desc: "Robust enterprise backend and high-scale systems.", icon: "☕" },
+    { name: "Python", desc: "The language of AI and data science worldwide.", icon: "🐍" },
+    { name: "JavaScript", desc: "Powering the modern interactive web experience.", icon: "📜" },
+    { name: "C++", desc: "Extreme performance for games and low-level systems.", icon: "⚙️" },
+    { name: "C#", desc: "The backbone of Unity and modern Windows apps.", icon: "🎮" },
+    { name: "Go", desc: "Designed for simple, reliable cloud infrastructure.", icon: "🐹" },
+    { name: "Rust", desc: "The future of safe and blazing fast systems.", icon: "🦀" },
+    { name: "Kotlin", desc: "Modern, concise development for Android devices.", icon: "📱" },
+    { name: "TypeScript", desc: "Bringing safety and scale to JavaScript apps.", icon: "🛡️" }
 ];
 
 function resize() {
@@ -401,7 +418,6 @@ function captureAndShow() {
     document.getElementById("data-overlay").style.opacity = "0";
     
     setTimeout(() => {
-        // Redraw single frame for screenshot
         draw(); 
         ctx.fillStyle = "rgba(0, 255, 255, 0.8)";
         ctx.font = "bold 24px Courier New";
@@ -417,18 +433,35 @@ function captureAndShow() {
         
         document.getElementById("hud").style.opacity = "1";
         document.getElementById("data-overlay").style.opacity = "1";
-        showToast("SNAPSHOT PREPARED");
+        showToast("SNAPSHOT READY");
     }, 100);
 }
-function shareSocial(platform) {
-    const text = `I just discovered Planet ${pName.innerText}! 🚀 ${pDesc.innerText}`;
-    const url = window.location.href;
 
-    if (platform === 'whatsapp') {
-        const shareUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text + " " + url)}`;
+function shareSocial(platform) {
+    const text = `🚀 I've discovered Planet ${pName.innerText} in DevSoc Space! ${pDesc.innerText} #DevSoc #SpaceExploration`;
+    const url = window.location.href;
+    
+    if (platform === 'linkedin') {
+        const shareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}&summary=${encodeURIComponent(text)}`;
+        window.open(shareUrl, '_blank');
+    } else if (platform === 'instagram' || platform === 'tiktok') {
+        // Handle clipboard copy for caption
+        try {
+            const tempInput = document.createElement("input");
+            tempInput.value = text;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand("copy");
+            document.body.removeChild(tempInput);
+            showToast("CAPTION COPIED & LOG SAVED");
+        } catch(e) {}
+
+        downloadImage();
         
-        // Try direct redirect (better for mobile)
-        window.location.href = shareUrl;
+        setTimeout(() => {
+            const target = platform === 'instagram' ? "https://www.instagram.com/" : "https://www.tiktok.com/upload";
+            window.open(target, '_blank');
+        }, 1200);
     }
 }
 
@@ -439,19 +472,18 @@ function closePreview() {
 
 function downloadImage() {
     const link = document.createElement('a');
-    link.download = `exploration_${pName.innerText.toLowerCase()}.png`;
+    link.download = `planet_${pName.innerText.toLowerCase()}.png`;
     link.href = previewImg.src;
     link.click();
-    showToast("IMAGE SAVED TO GALLERY");
+    showToast("LOG SAVED TO GALLERY");
 }
 
 function showToast(msg) {
     toast.innerText = msg;
     toast.style.display = "block";
-    setTimeout(() => { toast.style.display = "none"; }, 3000);
+    setTimeout(() => { toast.style.display = "none"; }, 4000);
 }
 
-/* ================= INIT ================= */
 const sun = { x: 0, y: 0, radius: 110, mass: 65000, color: "#ff4d00", id: 'sun' };
 const planets = [];
 const planetColors = ["#555", "#8a6", "#46a", "#a44", "#a84", "#68a", "#84a", "#4a8", "#666"];
