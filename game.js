@@ -444,10 +444,34 @@ async function copyImageToClipboard() {
 
 async function shareSocial(platform) {
     const url = window.location.href;
-    const text = `🚀 I've discovered Planet ${pName.innerText} in UJDevSoc Space! ${pDesc.innerText}\n\nExplore with me: ${url}\n\n#DevSoc #SpaceExploration`;
+
+    const text = `🚀 I've discovered Planet ${pName.innerText} in DevSoc Space!\n\n${pDesc.innerText}\n\n${url}\n\n#DevSoc #SpaceExploration`;
+
+    //  Convert blob → file
+    let file = null;
+    if (currentSnapshotBlob) {
+        file = new File(
+            [currentSnapshotBlob],
+            `planet_${pName.innerText.toLowerCase()}.png`,
+            { type: "image/png" }
+        );
+    }
 
     try {
-        // PRIMARY: Native share sheet (BEST OPTION)
+        //  LEVEL 2: Share with image (if supported)
+        if (navigator.canShare && file && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+                title: `Planet ${pName.innerText}`,
+                text: text,
+                url: url,
+                files: [file]   //  IMAGE INCLUDED
+            });
+
+            showToast("SHARED WITH IMAGE 🚀");
+            return;
+        }
+
+        // 📱 LEVEL 1: Share without image (fallback)
         if (navigator.share) {
             await navigator.share({
                 title: `Planet ${pName.innerText}`,
@@ -455,43 +479,41 @@ async function shareSocial(platform) {
                 url: url
             });
 
-            showToast("SHARE OPENED 🚀");
+            showToast("SHARED (TEXT MODE)");
             return;
         }
+
     } catch (err) {
-        console.log("Native share cancelled or failed:", err);
+        console.log("Share failed:", err);
     }
 
-    //  FALLBACKS (desktop / unsupported browsers)
-    if (platform === 'linkedin') {
-        const shareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
-        window.open(shareUrl, '_blank');
-        showToast("OPENING LINKEDIN...");
+    //  FINAL FALLBACK (desktop / unsupported devices)
+
+    if (platform === "linkedin") {
+        const shareUrl =
+            `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
+
+        window.open(shareUrl, "_blank");
+        showToast("OPENING LINKEDIN");
+        return;
     }
 
-    else if (platform === 'instagram' || platform === 'tiktok') {
-        try {
-            await navigator.clipboard.writeText(text);
-            showToast("CAPTION COPIED!");
-        } catch (e) {
-            // fallback old method
-            const tempInput = document.createElement("textarea");
-            tempInput.value = text;
-            document.body.appendChild(tempInput);
-            tempInput.select();
-            document.execCommand("copy");
-            document.body.removeChild(tempInput);
-            showToast("CAPTION COPIED!");
-        }
+    //  Copy text + image fallback
+    try {
+        await navigator.clipboard.writeText(text);
+        showToast("CAPTION COPIED 📋 (UPLOAD IMAGE MANUALLY)");
+    } catch (e) {
+        showToast("COPY FAILED");
+    }
 
-        const target = platform === 'instagram'
+    const target =
+        platform === "instagram"
             ? "https://www.instagram.com/"
             : "https://www.tiktok.com/upload";
 
-        setTimeout(() => {
-            window.open(target, '_blank');
-        }, 800);
-    }
+    setTimeout(() => {
+        window.open(target, "_blank");
+    }, 800);
 }
 
 function closePopups() {
