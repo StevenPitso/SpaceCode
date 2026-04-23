@@ -4,21 +4,32 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="style.css">
-    <title>SpaceCode - Android-15-Clone | Fuel Limited Mission</title>
+    <title>SpaceCode - Android-15-Clone</title>
 </head>
 <body>
+<!---
+I made this game because I love space and coding, inspired by the Android Easter Egg game.
+ I recently came back to it and improved the physics after watching Project Hail Mary in cinemas
+— it really got me thinking differently about motion and gravity.
+I hope this is AMAZE AMAZE :)
 
+
+-->
 <div id="toast">SYSTEM: ACTION COMPLETE</div>
 
 <div id="data-overlay">
+
     STAR: MARSHMALLOW^M (TM-41126)<br>
     STATUS: GRAVITY WELL ACTIVE<br>
     MISSION: VISIT ALL 9 PLANETS (NO REFUEL)<br>
     BODIES: <span id="bodies-count">0 / 9</span>
+
 </div>
 
 <div id="hud">
+
     <div class="stat-box">VEL:<span id="vel" class="stat-value">0.0</span></div>
+
     <div class="stat-box">POWER:<span id="power" class="stat-value">0%</span></div>
     <div class="stat-box">COORD:<span id="coord" class="stat-value">0,0</span></div>
     <div id="fuel-bar-container">
@@ -37,8 +48,9 @@
 
 <div id="planet-popup">
     <div class="exit-x" onclick="closePopups()">✕</div>
+
     <div id="planet-icon" style="font-size: 50px; margin-bottom: 5px; margin-top: 10px;">🪐</div>
-    <h3 id="planet-name"></h3>
+        <h3 id="planet-name"></h3>
     <p id="planet-desc" style="font-size: 14px; color: #aaa; line-height: 1.5;"></p>
     
     <button class="share-btn" onclick="captureAndShow()">
@@ -49,19 +61,26 @@
 
 <div id="screenshot-overlay">
     <div class="exit-x" style="top: 20px; right: 25px; font-size: 30px;" onclick="closePopups()">✕</div>
+
     <h2 style="color: #0ff; margin-bottom: 15px; letter-spacing: 2px; text-align: center;">LOG ENTRY CAPTURED</h2>
     <img id="preview-img" alt="Planet Screenshot">
     
-    <div style="display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 400px;">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-            <button class="share-btn" style="padding: 15px; margin-top: 0; font-size: 12px;" onclick="downloadImage()">💾 SAVE LOG</button>
-            <button class="share-btn" style="padding: 15px; margin-top: 0; font-size: 12px; background: #fff; color: #000;" onclick="copyImageToClipboard()">📋 COPY IMAGE</button>
+    <div style="  display: flex;    flex-direction: column; gap: 10px; width: 100%; max-width: 400px;">
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr;        gap: 10px;">
+
+            <button class="share-btn" style="   padding: 15px; margin-top: 0; font-size: 12px;" onclick="downloadImage()">💾 SAVE LOG</button>
+
+            <button class="share-btn" style="padding: 15px;     margin-top: 0; font-size: 12px; background: #fff; color: #000;" onclick="copyImageToClipboard()">📋 COPY IMAGE</button>
         </div>
         
         <div class="social-grid" style="margin-top: 0;">
+
+
             <button class="social-btn" style="background: #0077b5;" onclick="shareSocial('linkedin')">LinkedIn</button>
             <button class="social-btn" style="background: #E1306C;" onclick="shareSocial('instagram')">Instagram</button>
-            <button class="social-btn" style="background: #000; border: 1px solid #ff0050; grid-column: span 2;" onclick="shareSocial('tiktok')">Post on TikTok</button>
+
+            <button class="social-btn" style="background: #000;      border: 1px solid #ff0050; grid-column: span 2;" onclick="shareSocial('tiktok')">Post on TikTok</button>
         </div>
         <p class="guide-text" style="text-align: center;">1. Copy caption/image & Save log <br> 2. Open app and post your discovery</p>
     </div>
@@ -86,4 +105,5 @@
 <script src="game.js"></script>
 
 </body>
+   
 </html>
