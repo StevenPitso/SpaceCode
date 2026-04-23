@@ -40,7 +40,8 @@ class Player {
             }
             
             // Reduce particle count on mobile for performance
-            if (Math.random() > 0.5 && currentFuel > 0) {
+            const particleChance = window.particleMultiplier ? 0.7 + (1 - window.particleMultiplier) : 0.5;
+            if (Math.random() > particleChance && currentFuel > 0) {
                 this.particles.push(new Particle(this.x, this.y, -Math.cos(this.direction)*2.5, -Math.sin(this.direction)*2.5));
             }
         } else {
@@ -65,11 +66,13 @@ class Player {
             
             const newVel = Math.hypot(this.vx, this.vy);
             if (this.landedOn !== p && p.id !== 'sun' && newVel > oldVel + 0.5 && newVel > currentSpeed + 0.5) {
-                this.slingshotMessage = `⚡ GRAVITY SLINGSHOT! +${(newVel - oldVel).toFixed(1)} VEL ⚡`;
-                this.slingshotTimer = 60;
-                playSound('slingshot');
-                showToast(this.slingshotMessage);
-            }
+                if (window.showSlingshotMessages !== false) {
+                    this.slingshotMessage = `⚡ GRAVITY SLINGSHOT! +${(newVel - oldVel).toFixed(1)} VEL ⚡`;
+                    this.slingshotTimer = 60;
+                    playSound('slingshot');
+                    showToast(this.slingshotMessage);
+                }
+            }            
 
             const minP = this.radius + p.radius;
             if (distToBody < minP) {

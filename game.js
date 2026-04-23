@@ -519,8 +519,169 @@ function checkShowHint() {
     }
 }
 
+// Fullscreen handling
+function toggleFullscreen() {
+    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+        // Enter fullscreen
+        const elem = document.documentElement;
+        if (elem.requestFullscreen) {
+            elem.requestFullscreen();
+        } else if (elem.webkitRequestFullscreen) {
+            elem.webkitRequestFullscreen();
+        } else if (elem.msRequestFullscreen) {
+            elem.msRequestFullscreen();
+        }
+        showToast("FULLSCREEN MODE");
+        
+        // Haptic feedback
+        if (window.navigator && window.navigator.vibrate) {
+            window.navigator.vibrate(50);
+        }
+    } else {
+        // Exit fullscreen
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+        }
+        showToast("EXIT FULLSCREEN");
+    }
+}
+
+// Orientation handling
+function checkOrientation() {
+    if (window.matchMedia("(orientation: portrait)").matches && window.innerWidth <= 768) {
+        // In portrait mode, show warning
+        const warning = document.getElementById("orientation-warning");
+        if (warning) warning.style.display = "flex";
+        isPaused = true;
+    } else {
+        const warning = document.getElementById("orientation-warning");
+        if (warning) warning.style.display = "none";
+        isPaused = false;
+    }
+}
+
+function hideOrientationWarning() {
+    const warning = document.getElementById("orientation-warning");
+    warning.style.display = "none";
+    isPaused = false;
+    showToast("CONTINUING IN PORTRAIT MODE");
+}
+
+// Performance monitoring and adjustments
+let frameTimes = [];
+let performanceMode = false;
+
+function monitorPerformance() {
+    const now = performance.now();
+    frameTimes.push(now);
+    
+    // Keep last 60 frame times
+    if (frameTimes.length > 60) frameTimes.shift();
+    
+    if (frameTimes.length >= 30) {
+        const avgFrameTime = (frameTimes[frameTimes.length - 1] - frameTimes[0]) / frameTimes.length;
+        const fps = 1000 / avgFrameTime;
+        
+        // If FPS drops below 45, enable performance mode
+        if (fps < 45 && !performanceMode) {
+            performanceMode = true;
+            enablePerformanceMode();
+        } else if (fps > 55 && performanceMode) {
+            performanceMode = false;
+            disablePerformanceMode();
+        }
+    }
+    
+    requestAnimationFrame(monitorPerformance);
+}
+
+function enablePerformanceMode() {
+    // Reduce particle count
+    window.particleMultiplier = 0.3;
+    
+    // Reduce visual effects
+    window.lowQualityMode = true;
+    
+    // Show badge
+    const badge = document.getElementById("performance-badge");
+    if (badge) badge.style.display = "block";
+    
+    // Hide slingshot messages for performance
+    window.showSlingshotMessages = false;
+    
+    console.log("Performance mode enabled - reducing effects");
+}
+
+function disablePerformanceMode() {
+    window.particleMultiplier = 0.6;
+    window.lowQualityMode = false;
+    
+    const badge = document.getElementById("performance-badge");
+    if (badge) badge.style.display = "none";
+    
+    window.showSlingshotMessages = true;
+    
+    console.log("Performance mode disabled");
+}
+
+// Optimized resize handler with debounce
+let resizeTimeout;
+window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+        resize();
+        checkOrientation();
+    }, 100);
+});
+
+// Listen for fullscreen change events
+document.addEventListener('fullscreenchange', updateFullscreenButton);
+document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
+
+function updateFullscreenButton() {
+    const btn = document.getElementById("fullscreen-btn");
+    if (!btn) return;
+    
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+        // In fullscreen, change icon to exit
+        btn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/>
+        </svg>`;
+    } else {
+        btn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+        </svg>`;
+    }
+}
+
+// Also update the particle creation in player.js to respect performance mode
+// Add this to the particle creation section in player.js:
+// if (window.particleMultiplier && Math.random() > window.particleMultiplier) { ... }
+
+// Initialize all mobile features
+function initMobileFeatures() {
+    checkOrientation();
+    window.addEventListener('orientationchange', () => {
+        setTimeout(checkOrientation, 100);
+    });
+    
+    // Start performance monitoring on higher-end devices only
+    if (window.navigator.hardwareConcurrency > 4) {
+        monitorPerformance();
+    }
+    
+    // Set initial particle multiplier
+    window.particleMultiplier = 0.6;
+    window.showSlingshotMessages = true;
+    window.lowQualityMode = false;
+}
+
 // Initialize everything
 initAudio();
 updateFuelDisplay();
-checkShowHint(); // Show mobile hint if needed
+checkShowHint();
+initMobileFeatures(); // Initialize mobile features
+updateFullscreenButton(); // Set initial fullscreen button state
 window.onload = animate;
