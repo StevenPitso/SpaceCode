@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Space - Orbital Mechanics</title>
+    <title>Space - Orbital Mechanics | Black Holes & Sound</title>
     <style>
         body { margin: 0; overflow: hidden; background: #0a0a0c; font-family: 'Courier New', Courier, monospace; }
         canvas { display: block; touch-action: none; }
@@ -22,6 +22,8 @@
             transform: translateX(-50%);
             display: flex;
             gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
         }
 
         .stat-box {
@@ -34,12 +36,79 @@
         }
 
         .stat-value { color: #fff; font-weight: bold; margin-left: 5px; }
+        
+        #fuel-bar-container {
+            background: rgba(15, 15, 20, 0.8);
+            border: 1px solid #2a2a35;
+            padding: 10px 15px;
+            min-width: 150px;
+        }
+        
+        #fuel-bar {
+            width: 100%;
+            height: 12px;
+            background: #2a2a35;
+            border-radius: 6px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+        
+        #fuel-fill {
+            height: 100%;
+            width: 100%;
+            background: linear-gradient(90deg, #0ff, #0f0);
+            transition: width 0.2s, background 0.3s;
+            border-radius: 6px;
+        }
+        
+        .fuel-warning { color: #ff4444; animation: pulse 1s infinite; }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
 
         #data-overlay {
             bottom: 30px;
             left: 30px;
             font-size: 11px;
             line-height: 1.4;
+        }
+
+        /* Minimap Styles */
+        #minimap-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 180px;
+            height: 180px;
+            background: rgba(10, 10, 15, 0.85);
+            border: 1px solid #2a2a35;
+            border-radius: 12px;
+            backdrop-filter: blur(5px);
+            z-index: 20;
+            pointer-events: none;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+        
+        #minimap-title {
+            position: absolute;
+            top: 5px;
+            left: 8px;
+            font-size: 8px;
+            color: #0ff;
+            letter-spacing: 1px;
+            font-weight: bold;
+            text-transform: uppercase;
+            z-index: 21;
+            pointer-events: none;
+        }
+        
+        canvas#minimap {
+            width: 100%;
+            height: 100%;
+            border-radius: 12px;
+            display: block;
         }
 
         #planet-popup {
@@ -117,7 +186,8 @@
         #toast {
             position: fixed;
             top: 20px;
-            right: 20px;
+            left: 50%;
+            transform: translateX(-50%);
             background: #0ff;
             color: #000;
             padding: 15px 25px;
@@ -127,6 +197,7 @@
             display: none;
             z-index: 4000;
             box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            white-space: nowrap;
         }
 
         #screenshot-overlay {
@@ -181,6 +252,57 @@
             margin-top: 10px;
             text-transform: uppercase;
         }
+        
+        #game-over {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.95);
+            border: 3px solid #ff4444;
+            padding: 40px;
+            text-align: center;
+            z-index: 3000;
+            display: none;
+            border-radius: 20px;
+            min-width: 300px;
+        }
+        
+        #game-over h2 { color: #ff4444; margin-bottom: 20px; }
+        #game-over button {
+            background: #0ff;
+            border: none;
+            padding: 15px 30px;
+            margin-top: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            font-family: monospace;
+            font-size: 16px;
+        }
+        
+        #blackhole-warning {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ff00ff;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 0 0 20px #ff00ff;
+            pointer-events: none;
+            z-index: 15;
+            opacity: 0;
+            transition: opacity 0.3s;
+            white-space: nowrap;
+        }
+        
+        @media (max-width: 768px) {
+            #minimap-container { width: 130px; height: 130px; top: 10px; right: 10px; }
+            #minimap-title { font-size: 6px; }
+            .stat-box { padding: 6px 10px; font-size: 9px; }
+            #fuel-bar-container { padding: 6px 10px; min-width: 100px; }
+            #blackhole-warning { font-size: 16px; white-space: nowrap; }
+        }
     </style>
 </head>
 <body>
@@ -190,7 +312,7 @@
 <div id="data-overlay">
     STAR: MARSHMALLOW^M (TM-41126)<br>
     STATUS: GRAVITY WELL ACTIVE<br>
-    SENSORS: VECTOR OVERLAY ENABLED<br>
+    MISSION: VISIT ALL 9 PLANETS (NO REFUEL)<br>
     BODIES: <span id="bodies-count">0 / 9</span>
 </div>
 
@@ -198,6 +320,18 @@
     <div class="stat-box">VEL:<span id="vel" class="stat-value">0.0</span></div>
     <div class="stat-box">POWER:<span id="power" class="stat-value">0%</span></div>
     <div class="stat-box">COORD:<span id="coord" class="stat-value">0,0</span></div>
+    <div id="fuel-bar-container">
+        FUEL: <span id="fuel-value" class="stat-value">1000</span>
+        <div id="fuel-bar">
+            <div id="fuel-fill"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Minimap Container -->
+<div id="minimap-container">
+    <div id="minimap-title">SENSOR MAP</div>
+    <canvas id="minimap" width="180" height="180"></canvas>
 </div>
 
 <div id="planet-popup">
@@ -232,20 +366,300 @@
     </div>
 </div>
 
+<div id="game-over">
+    <h2 id="game-over-title">MISSION FAILED</h2>
+    <p id="game-over-message">You ran out of fuel!</p>
+    <p id="planets-visited">Planets visited: 0/9</p>
+    <button onclick="resetGame()">⟳ RESTART MISSION</button>
+</div>
+
+<div id="blackhole-warning">⚠️ ENTERING EVENT HORIZON ⚠️</div>
+
 <canvas id="canvas"></canvas>
 
 <script>
+// Audio Context Setup
+let audioCtx = null;
+let soundsEnabled = false;
+
+function initAudio() {
+    if (!audioCtx && window.AudioContext) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        soundsEnabled = true;
+        // Resume on first user interaction
+        document.body.addEventListener('click', () => {
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+                showToast("🔊 SOUND ENABLED");
+            }
+        }, { once: true });
+    }
+}
+
+function playSound(type) {
+    if (!audioCtx || !soundsEnabled || audioCtx.state !== 'running') return;
+    
+    const now = audioCtx.currentTime;
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    
+    switch(type) {
+        case 'thrust':
+            oscillator.type = 'sawtooth';
+            oscillator.frequency.value = 200;
+            gainNode.gain.setValueAtTime(0.1, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
+            oscillator.start(now);
+            oscillator.stop(now + 0.2);
+            break;
+            
+        case 'landing':
+            oscillator.type = 'sine';
+            oscillator.frequency.value = 880;
+            gainNode.gain.setValueAtTime(0.15, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
+            oscillator.start(now);
+            oscillator.stop(now + 0.5);
+            
+            // Second harmonic
+            const osc2 = audioCtx.createOscillator();
+            const gain2 = audioCtx.createGain();
+            osc2.connect(gain2);
+            gain2.connect(audioCtx.destination);
+            osc2.type = 'sine';
+            osc2.frequency.value = 440;
+            gain2.gain.setValueAtTime(0.1, now);
+            gain2.gain.exponentialRampToValueAtTime(0.0001, now + 0.8);
+            osc2.start(now);
+            osc2.stop(now + 0.8);
+            break;
+            
+        case 'slingshot':
+            oscillator.type = 'square';
+            oscillator.frequency.value = 523.25; // C5
+            gainNode.gain.setValueAtTime(0.2, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
+            oscillator.start(now);
+            oscillator.stop(now + 0.3);
+            
+            const osc3 = audioCtx.createOscillator();
+            const gain3 = audioCtx.createGain();
+            osc3.connect(gain3);
+            gain3.connect(audioCtx.destination);
+            osc3.type = 'square';
+            osc3.frequency.value = 659.25; // E5
+            gain3.gain.setValueAtTime(0.15, now + 0.05);
+            gain3.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
+            osc3.start(now + 0.05);
+            osc3.stop(now + 0.35);
+            break;
+            
+        case 'warning':
+            oscillator.type = 'sine';
+            oscillator.frequency.value = 880;
+            gainNode.gain.setValueAtTime(0.3, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.15);
+            oscillator.start(now);
+            oscillator.stop(now + 0.15);
+            setTimeout(() => {
+                if (audioCtx && soundsEnabled) {
+                    const osc4 = audioCtx.createOscillator();
+                    const gain4 = audioCtx.createGain();
+                    osc4.connect(gain4);
+                    gain4.connect(audioCtx.destination);
+                    osc4.type = 'sine';
+                    osc4.frequency.value = 660;
+                    gain4.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                    gain4.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.15);
+                    osc4.start();
+                    osc4.stop(audioCtx.currentTime + 0.15);
+                }
+            }, 200);
+            break;
+            
+        case 'blackhole':
+            oscillator.type = 'sine';
+            oscillator.frequency.value = 50;
+            gainNode.gain.setValueAtTime(0.5, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 1.5);
+            oscillator.start(now);
+            oscillator.stop(now + 1.5);
+            
+            // Low rumble
+            const oscLow = audioCtx.createOscillator();
+            const gainLow = audioCtx.createGain();
+            oscLow.connect(gainLow);
+            gainLow.connect(audioCtx.destination);
+            oscLow.type = 'sine';
+            oscLow.frequency.value = 30;
+            gainLow.gain.setValueAtTime(0.3, now);
+            gainLow.gain.exponentialRampToValueAtTime(0.0001, now + 2);
+            oscLow.start(now);
+            oscLow.stop(now + 2);
+            break;
+            
+        case 'mission_complete':
+            [523.25, 659.25, 783.99].forEach((freq, i) => {
+                const osc5 = audioCtx.createOscillator();
+                const gain5 = audioCtx.createGain();
+                osc5.connect(gain5);
+                gain5.connect(audioCtx.destination);
+                osc5.type = 'sine';
+                osc5.frequency.value = freq;
+                gain5.gain.setValueAtTime(0.2, now + i * 0.15);
+                gain5.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.15 + 0.5);
+                osc5.start(now + i * 0.15);
+                osc5.stop(now + i * 0.15 + 0.5);
+            });
+            break;
+            
+        case 'mission_fail':
+            oscillator.type = 'sawtooth';
+            oscillator.frequency.value = 220;
+            gainNode.gain.setValueAtTime(0.3, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 1);
+            oscillator.start(now);
+            oscillator.stop(now + 1);
+            break;
+    }
+}
+
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
+const minimapCanvas = document.getElementById("minimap");
+const minimapCtx = minimapCanvas.getContext("2d");
 const planetPopup = document.getElementById("planet-popup");
 const pName = document.getElementById("planet-name");
 const pDesc = document.getElementById("planet-desc");
 const toast = document.getElementById("toast");
 const screenshotOverlay = document.getElementById("screenshot-overlay");
 const previewImg = document.getElementById("preview-img");
+const blackholeWarning = document.getElementById("blackhole-warning");
 
 let isPaused = false;
 let currentSnapshotBlob = null;
+let gameActive = true;
+
+// Fuel System Variables
+let currentFuel = 1000;
+const MAX_FUEL = 1000;
+const FUEL_CONSUMPTION_RATE = 1.2;
+
+// Slingshot tracking
+let lastSpeed = 0;
+let slingshotMessage = "";
+let slingshotTimer = 0;
+
+// Black Hole Class
+class BlackHole {
+    constructor(x, y, radius) {
+        this.x = x;
+        this.y = y;
+        this.radius = radius;
+        this.mass = 25000;
+        this.glowIntensity = 0;
+        this.accretionDiskAngle = 0;
+    }
+    
+    update() {
+        this.accretionDiskAngle += 0.02;
+        this.glowIntensity = 0.5 + Math.sin(Date.now() * 0.003) * 0.3;
+    }
+    
+    draw(ctx, camera) {
+        const screenX = this.x - camera.x;
+        const screenY = this.y - camera.y;
+        
+        // Event horizon
+        const gradient = ctx.createRadialGradient(screenX, screenY, 0, screenX, screenY, this.radius);
+        gradient.addColorStop(0, "#000000");
+        gradient.addColorStop(0.7, "#1a0033");
+        gradient.addColorStop(1, "#330066");
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Accretion disk
+        for (let i = 0; i < 3; i++) {
+            const diskRadius = this.radius + 15 + i * 12;
+            ctx.beginPath();
+            ctx.ellipse(screenX, screenY, diskRadius, diskRadius * 0.3, this.accretionDiskAngle + i, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 80, 255, ${0.1 - i * 0.03})`;
+            ctx.fill();
+        }
+        
+        // Gravitational lensing effect
+        ctx.strokeStyle = `rgba(255, 0, 255, ${0.3 + Math.sin(Date.now() * 0.005) * 0.2})`;
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 3; i++) {
+            ctx.beginPath();
+            ctx.arc(screenX, screenY, this.radius + 5 + i * 8, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+        
+        // Inner glow
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = "#ff00ff";
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, this.radius * 0.8, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 0, 255, 0.2)`;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+    }
+    
+    applyGravity(player) {
+        const dx = this.x - player.x;
+        const dy = this.y - player.y;
+        const dist = Math.hypot(dx, dy);
+        const angle = Math.atan2(dy, dx);
+        
+        if (dist < this.radius + player.radius) {
+            // Fallen into black hole!
+            if (gameActive) {
+                gameActive = false;
+                isPaused = true;
+                playSound('blackhole');
+                const visited = planets.filter(p => p.hasFlag).length;
+                document.getElementById("game-over-title").innerHTML = "💀 LOST TO THE VOID 💀";
+                document.getElementById("game-over-message").innerHTML = "Your ship was consumed by a black hole.\nSpaghettification complete.";
+                document.getElementById("planets-visited").innerHTML = `Planets visited: ${visited}/9`;
+                document.getElementById("game-over").style.display = "block";
+                showToast("CRITICAL: ENTERED BLACK HOLE EVENT HORIZON");
+                
+                // Show warning flash
+                blackholeWarning.style.opacity = "1";
+                setTimeout(() => { blackholeWarning.style.opacity = "0"; }, 2000);
+            }
+            return true;
+        }
+        
+        // Extreme gravity pull from black hole
+        const force = (this.mass * 0.8) / Math.max(dist * dist, 100);
+        player.vx += Math.cos(angle) * force;
+        player.vy += Math.sin(angle) * force;
+        
+        // Warning when getting too close
+        if (dist < this.radius * 3 && gameActive && !player.landedOn) {
+            blackholeWarning.style.opacity = Math.min(1, (this.radius * 3 - dist) / this.radius);
+            if (Math.random() < 0.05) playSound('warning');
+        } else if (blackholeWarning.style.opacity !== "0") {
+            blackholeWarning.style.opacity = "0";
+        }
+        
+        return false;
+    }
+}
+
+// Create black holes
+const blackHoles = [
+    new BlackHole(-1200, -800, 35),
+    new BlackHole(1400, 600, 40),
+    new BlackHole(500, -1300, 30)
+];
 
 // Physics Constants
 const G_CONSTANT = 0.12; 
@@ -274,14 +688,97 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
+function updateFuelDisplay() {
+    const fuelPercent = (currentFuel / MAX_FUEL) * 100;
+    document.getElementById("fuel-value").innerText = Math.floor(currentFuel);
+    document.getElementById("fuel-fill").style.width = fuelPercent + "%";
+    
+    const fuelFill = document.getElementById("fuel-fill");
+    if (fuelPercent < 20) {
+        fuelFill.style.background = "linear-gradient(90deg, #ff4444, #ff8844)";
+        document.getElementById("fuel-value").classList.add("fuel-warning");
+    } else if (fuelPercent < 50) {
+        fuelFill.style.background = "linear-gradient(90deg, #ffaa44, #ffdd44)";
+        document.getElementById("fuel-value").classList.remove("fuel-warning");
+    } else {
+        fuelFill.style.background = "linear-gradient(90deg, #0ff, #0f0)";
+        document.getElementById("fuel-value").classList.remove("fuel-warning");
+    }
+}
+
+function consumeFuel(amount) {
+    if (!gameActive) return false;
+    
+    currentFuel = Math.max(0, currentFuel - amount);
+    updateFuelDisplay();
+    
+    if (currentFuel <= 0 && gameActive) {
+        gameActive = false;
+        isPaused = true;
+        playSound('mission_fail');
+        const visited = planets.filter(p => p.hasFlag).length;
+        document.getElementById("game-over-title").innerText = "MISSION FAILED";
+        document.getElementById("game-over-message").innerHTML = "⚠️ FUEL DEPLETED ⚠️<br>Your ship is adrift in space.";
+        document.getElementById("planets-visited").innerHTML = `Planets visited: ${visited}/9`;
+        document.getElementById("game-over").style.display = "block";
+        showToast("CRITICAL: FUEL EMPTY - MISSION FAILED");
+        return false;
+    }
+    return true;
+}
+
+function resetGame() {
+    gameActive = true;
+    isPaused = false;
+    currentFuel = MAX_FUEL;
+    updateFuelDisplay();
+    
+    planets.forEach((planet, idx) => {
+        planet.hasFlag = false;
+        planet.angle = Math.random() * Math.PI * 2;
+    });
+    
+    player.x = 0;
+    player.y = -900;
+    player.vx = 0;
+    player.vy = 0;
+    player.landedOn = null;
+    player.thrust = 0;
+    player.particles = [];
+    
+    slingshotMessage = "";
+    slingshotTimer = 0;
+    blackholeWarning.style.opacity = "0";
+    
+    document.getElementById("game-over").style.display = "none";
+    planetPopup.style.display = "none";
+    showToast("MISSION RESTARTED - AVOID BLACK HOLES AND THE SUN!");
+    playSound('thrust'); // Brief sound to confirm restart
+}
+
+function checkMissionComplete() {
+    const visitedCount = planets.filter(p => p.hasFlag).length;
+    if (visitedCount === 9 && gameActive) {
+        gameActive = false;
+        isPaused = true;
+        playSound('mission_complete');
+        const fuelRemaining = Math.floor(currentFuel);
+        document.getElementById("game-over-title").innerHTML = "✅ MISSION ACCOMPLISHED! ✅";
+        document.getElementById("game-over-message").innerHTML = `You visited all 9 planets!<br>Fuel remaining: ${fuelRemaining} units<br>Outstanding piloting!`;
+        document.getElementById("planets-visited").innerHTML = `Perfect score: 9/9 planets`;
+        document.getElementById("game-over").style.display = "block";
+        showToast("MISSION COMPLETE! ALL PLANETS VISITED!");
+    }
+}
+
 class Controls {
     constructor() {
         this.mouse = { x: 0, y: 0, isDown: false };
         window.addEventListener("mousemove", e => { this.mouse.x = e.clientX; this.mouse.y = e.clientY; });
-        window.addEventListener("mousedown", () => { if(!isPaused) this.mouse.isDown = true; });
+        window.addEventListener("mousedown", () => { if(!isPaused && gameActive) this.mouse.isDown = true; });
         window.addEventListener("mouseup", () => { this.mouse.isDown = false; });
         window.addEventListener("touchstart", e => {
-            if(isPaused) return;
+            if(isPaused || !gameActive) return;
             const t = e.touches[0];
             this.mouse.x = t.clientX; this.mouse.y = t.clientY;
             this.mouse.isDown = true;
@@ -321,19 +818,27 @@ class Player {
     }
 
     update(planets, sun) {
-        if (isPaused) return;
+        if (isPaused || !gameActive) return;
 
+        const currentSpeed = Math.hypot(this.vx, this.vy);
+        
         const dx = this.controls.mouse.x - canvas.width / 2;
         const dy = this.controls.mouse.y - canvas.height / 2;
         const dist = Math.hypot(dx, dy);
         this.direction = Math.atan2(dy, dx);
 
-        if (this.controls.mouse.isDown) {
+        if (this.controls.mouse.isDown && currentFuel > 0) {
             this.thrust = Math.min(dist / MAX_THRUST_DIST, 1);
             const force = this.thrust * MAX_THRUST_FORCE;
             
-            this.vx += Math.cos(this.direction) * force;
-            this.vy += Math.sin(this.direction) * force;
+            const fuelCost = this.thrust * FUEL_CONSUMPTION_RATE;
+            if (consumeFuel(fuelCost)) {
+                this.vx += Math.cos(this.direction) * force;
+                this.vy += Math.sin(this.direction) * force;
+                playSound('thrust');
+            } else {
+                this.thrust = 0;
+            }
             
             if (this.landedOn && this.thrust > BREAKOUT_THRUST_LIMIT) {
                 this.landedOn = null;
@@ -342,7 +847,7 @@ class Player {
                 this.vy += Math.sin(this.direction) * 3.5;
             }
             
-            if (Math.random() > 0.4) {
+            if (Math.random() > 0.4 && currentFuel > 0) {
                 this.particles.push(new Particle(this.x, this.y, -Math.cos(this.direction)*2.5, -Math.sin(this.direction)*2.5));
             }
         } else {
@@ -357,11 +862,20 @@ class Player {
             const pdy = p.y - this.y;
             const distToBody = Math.hypot(pdx, pdy);
             const angle = Math.atan2(pdy, pdx);
+            const oldVel = Math.hypot(this.vx, this.vy);
 
             if (this.landedOn !== p) {
                 const force = (G_CONSTANT * p.mass) / Math.max(distToBody * distToBody, 400);
                 this.vx += Math.cos(angle) * force;
                 this.vy += Math.sin(angle) * force;
+            }
+            
+            const newVel = Math.hypot(this.vx, this.vy);
+            if (this.landedOn !== p && p.id !== 'sun' && newVel > oldVel + 0.5 && newVel > currentSpeed + 0.5) {
+                slingshotMessage = `⚡ GRAVITY SLINGSHOT! +${(newVel - oldVel).toFixed(1)} VEL ⚡`;
+                slingshotTimer = 60;
+                playSound('slingshot');
+                showToast(slingshotMessage);
             }
 
             const minP = this.radius + p.radius;
@@ -372,7 +886,9 @@ class Player {
                         this.landedOn = p;
                         p.hasFlag = true;
                         this.vx = 0; this.vy = 0;
+                        playSound('landing');
                         showPlanetData(p);
+                        checkMissionComplete();
                     }
                 } else if (this.landedOn !== p) {
                     const nx = pdx / distToBody; const ny = pdy / distToBody;
@@ -385,6 +901,26 @@ class Player {
             }
             if (p.hasFlag) claimedCount++;
         });
+        
+        // Apply black hole gravity and check for death
+        for (let bh of blackHoles) {
+            if (bh.applyGravity(this)) return; // Game over
+        }
+        
+        // Sun hazard - death if too close
+        const distToSun = Math.hypot(sun.x - this.x, sun.y - this.y);
+        if (distToSun < sun.radius + this.radius && gameActive) {
+            gameActive = false;
+            isPaused = true;
+            playSound('blackhole');
+            const visited = planets.filter(p => p.hasFlag).length;
+            document.getElementById("game-over-title").innerHTML = "☀️ INCINERATED ☀️";
+            document.getElementById("game-over-message").innerHTML = "Your ship was destroyed by solar radiation.\nToo close to the star!";
+            document.getElementById("planets-visited").innerHTML = `Planets visited: ${visited}/9`;
+            document.getElementById("game-over").style.display = "block";
+            showToast("CRITICAL: SOLAR INCINERATION");
+            return;
+        }
 
         if (this.landedOn) {
             const p = this.landedOn;
@@ -404,9 +940,15 @@ class Player {
         this.particles.forEach(p => p.update());
         this.particles = this.particles.filter(p => p.life > 0);
 
+        if (slingshotTimer > 0) {
+            slingshotTimer--;
+        } else {
+            slingshotMessage = "";
+        }
+
         const currentSpeedVal = Math.hypot(this.vx, this.vy);
         document.getElementById("vel").innerText = currentSpeedVal.toFixed(1);
-        document.getElementById("power").innerText = Math.round(this.thrust * 100) + "%";
+        document.getElementById("power").innerText = this.thrust > 0 && currentFuel > 0 ? Math.round(this.thrust * 100) + "%" : "0%";
         document.getElementById("coord").innerText = `${Math.floor(this.x)},${Math.floor(this.y)}`;
         document.getElementById("bodies-count").innerText = `${claimedCount} / 9`;
     }
@@ -416,9 +958,7 @@ class Player {
         const shipScreenX = canvas.width / 2;
         const shipScreenY = canvas.height / 2;
 
-        // Visual Guidance System (Interaction Overlay)
-        if (this.controls.mouse.isDown && !isPaused) {
-            // Thrust Intent Vector Line (dashed)
+        if (this.controls.mouse.isDown && !isPaused && gameActive && currentFuel > 0) {
             ctx.setLineDash([5, 5]);
             ctx.strokeStyle = "rgba(0, 255, 255, 0.4)";
             ctx.beginPath();
@@ -427,32 +967,27 @@ class Player {
             ctx.stroke();
             ctx.setLineDash([]);
 
-            // Target Point Circle
             ctx.strokeStyle = "#0ff";
             ctx.beginPath();
             ctx.arc(this.controls.mouse.x, this.controls.mouse.y, 5 + Math.sin(Date.now()*0.01)*2, 0, Math.PI * 2);
             ctx.stroke();
 
-            // Magnitude Power Ring
             ctx.strokeStyle = "rgba(0, 255, 255, 0.2)";
             ctx.beginPath();
             ctx.arc(shipScreenX, shipScreenY, MAX_THRUST_DIST * this.thrust, 0, Math.PI * 2);
             ctx.stroke();
         }
 
-        // Persistent Velocity Vector Line
         const currentSpeed = Math.hypot(this.vx, this.vy);
         if (currentSpeed > 0.1) {
             ctx.strokeStyle = "#4da6ff";
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.moveTo(shipScreenX, shipScreenY);
-            // Length scales with velocity
             const vectorScale = 8;
             ctx.lineTo(shipScreenX + this.vx * vectorScale, shipScreenY + this.vy * vectorScale);
             ctx.stroke();
             
-            // Vector Arrow Head
             const vAngle = Math.atan2(this.vy, this.vx);
             ctx.save();
             ctx.translate(shipScreenX + this.vx * vectorScale, shipScreenY + this.vy * vectorScale);
@@ -467,7 +1002,15 @@ class Player {
             ctx.lineWidth = 1;
         }
 
-        // Direction Indicator Ring
+        if (slingshotMessage && slingshotTimer > 0) {
+            ctx.font = "bold 12px 'Courier New'";
+            ctx.fillStyle = "#ffaa44";
+            ctx.shadowBlur = 5;
+            ctx.shadowColor = "#ffaa44";
+            ctx.fillText(slingshotMessage, shipScreenX - 100, shipScreenY - 50);
+            ctx.shadowBlur = 0;
+        }
+
         ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
         ctx.beginPath();
         ctx.arc(shipScreenX, shipScreenY, 25, 0, Math.PI * 2);
@@ -488,9 +1031,24 @@ class Player {
         ctx.lineTo(8, 10); ctx.lineTo(-8, 10);
         ctx.closePath();
         ctx.stroke();
-        ctx.fillStyle = this.thrust > 0 ? "#0ff" : (this.landedOn ? "#0f0" : "#333");
+        
+        if (currentFuel <= 0) {
+            ctx.fillStyle = "#ff4444";
+        } else if (this.thrust > 0) {
+            ctx.fillStyle = "#0ff";
+        } else if (this.landedOn) {
+            ctx.fillStyle = "#0f0";
+        } else {
+            ctx.fillStyle = "#333";
+        }
         ctx.fillRect(-2, 4, 4, 4);
         ctx.restore();
+        
+        if (currentFuel < 200 && currentFuel > 0 && !this.landedOn) {
+            ctx.font = "bold 10px 'Courier New'";
+            ctx.fillStyle = "#ff4444";
+            ctx.fillText("⚠️ LOW FUEL", shipScreenX - 40, shipScreenY - 70);
+        }
     }
 }
 
@@ -506,6 +1064,7 @@ function captureAndShow() {
     planetPopup.style.display = "none";
     document.getElementById("hud").style.opacity = "0";
     document.getElementById("data-overlay").style.opacity = "0";
+    document.getElementById("minimap-container").style.opacity = "0";
     
     setTimeout(() => {
         draw(); 
@@ -516,6 +1075,8 @@ function captureAndShow() {
         ctx.font = "14px Courier New";
         ctx.fillText(pDesc.innerText, canvas.width - 40, 85);
         ctx.fillText("DEVSOC SPACE EXPLORER", canvas.width - 40, 110);
+        ctx.font = "10px Courier New";
+        ctx.fillText(`FUEL REMAINING: ${Math.floor(currentFuel)}/${MAX_FUEL}`, canvas.width - 40, 135);
 
         const dataURL = canvas.toDataURL("image/png");
         previewImg.src = dataURL;
@@ -528,6 +1089,7 @@ function captureAndShow() {
         
         document.getElementById("hud").style.opacity = "1";
         document.getElementById("data-overlay").style.opacity = "1";
+        document.getElementById("minimap-container").style.opacity = "1";
         showToast("SNAPSHOT GENERATED");
     }, 100);
 }
@@ -549,7 +1111,7 @@ async function copyImageToClipboard() {
 
 function shareSocial(platform) {
     const url = window.location.href;
-    const text = `🚀 I've discovered Planet ${pName.innerText} in DevSoc Space! ${pDesc.innerText}\n\nExplore with me: ${url}\n\n#DevSoc #SpaceExploration`;
+    const text = `🚀 I've discovered Planet ${pName.innerText} in DevSoc Space! ${pDesc.innerText}\n\nFuel remaining: ${Math.floor(currentFuel)}/${MAX_FUEL}\n\nExplore with me: ${url}\n\n#DevSoc #SpaceExploration #FuelEconomy`;
     
     if (platform === 'linkedin') {
         const shareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}&summary=${encodeURIComponent(text)}`;
@@ -591,6 +1153,129 @@ function showToast(msg) {
     toast.innerText = msg;
     toast.style.display = "block";
     setTimeout(() => { toast.style.display = "none"; }, 4000);
+}
+
+function drawMinimap(player, sun, planets) {
+    const size = minimapCanvas.width;
+    minimapCtx.clearRect(0, 0, size, size);
+    
+    minimapCtx.fillStyle = "rgba(10, 10, 15, 0.9)";
+    minimapCtx.fillRect(0, 0, size, size);
+    
+    let minX = sun.x, maxX = sun.x, minY = sun.y, maxY = sun.y;
+    planets.forEach(p => {
+        minX = Math.min(minX, p.x);
+        maxX = Math.max(maxX, p.x);
+        minY = Math.min(minY, p.y);
+        maxY = Math.max(maxY, p.y);
+    });
+    blackHoles.forEach(bh => {
+        minX = Math.min(minX, bh.x);
+        maxX = Math.max(maxX, bh.x);
+        minY = Math.min(minY, bh.y);
+        maxY = Math.max(maxY, bh.y);
+    });
+    minX = Math.min(minX, player.x);
+    maxX = Math.max(maxX, player.x);
+    minY = Math.min(minY, player.y);
+    maxY = Math.max(maxY, player.y);
+    
+    const padding = 50;
+    minX -= padding;
+    maxX += padding;
+    minY -= padding;
+    maxY += padding;
+    
+    const rangeX = maxX - minX;
+    const rangeY = maxY - minY;
+    
+    function worldToMap(x, y) {
+        return {
+            x: ((x - minX) / rangeX) * size,
+            y: ((y - minY) / rangeY) * size
+        };
+    }
+    
+    planets.forEach(planet => {
+        const orbitRadius = Math.hypot(planet.x - sun.x, planet.y - sun.y);
+        const sunMap = worldToMap(sun.x, sun.y);
+        const radiusOnMap = (orbitRadius / rangeX) * size;
+        
+        minimapCtx.beginPath();
+        minimapCtx.arc(sunMap.x, sunMap.y, radiusOnMap, 0, Math.PI * 2);
+        minimapCtx.strokeStyle = "rgba(100, 100, 150, 0.15)";
+        minimapCtx.lineWidth = 1;
+        minimapCtx.stroke();
+    });
+    
+    planets.forEach(planet => {
+        const pos = worldToMap(planet.x, planet.y);
+        minimapCtx.beginPath();
+        minimapCtx.arc(pos.x, pos.y, Math.max(3, planet.radius / 8), 0, Math.PI * 2);
+        
+        if (planet.hasFlag) {
+            minimapCtx.fillStyle = "#0f0";
+            minimapCtx.shadowBlur = 5;
+            minimapCtx.shadowColor = "#0f0";
+        } else {
+            minimapCtx.fillStyle = planet.color;
+            minimapCtx.shadowBlur = 0;
+        }
+        minimapCtx.fill();
+        
+        minimapCtx.font = "bold 8px 'Courier New'";
+        minimapCtx.fillStyle = "#aaa";
+        minimapCtx.shadowBlur = 0;
+        minimapCtx.fillText(planet.name[0], pos.x - 2, pos.y - 3);
+    });
+    
+    // Draw black holes on minimap
+    blackHoles.forEach(bh => {
+        const pos = worldToMap(bh.x, bh.y);
+        minimapCtx.beginPath();
+        minimapCtx.arc(pos.x, pos.y, 5, 0, Math.PI * 2);
+        minimapCtx.fillStyle = "#ff00ff";
+        minimapCtx.shadowBlur = 4;
+        minimapCtx.shadowColor = "#ff00ff";
+        minimapCtx.fill();
+        minimapCtx.font = "bold 6px 'Courier New'";
+        minimapCtx.fillStyle = "#ff88ff";
+        minimapCtx.fillText("BH", pos.x - 4, pos.y - 4);
+    });
+    
+    const sunPos = worldToMap(sun.x, sun.y);
+    minimapCtx.beginPath();
+    minimapCtx.arc(sunPos.x, sunPos.y, Math.max(6, sun.radius / 12), 0, Math.PI * 2);
+    minimapCtx.fillStyle = "#ff6600";
+    minimapCtx.shadowBlur = 8;
+    minimapCtx.shadowColor = "#ff6600";
+    minimapCtx.fill();
+    minimapCtx.shadowBlur = 0;
+    
+    const playerPos = worldToMap(player.x, player.y);
+    minimapCtx.save();
+    minimapCtx.translate(playerPos.x, playerPos.y);
+    minimapCtx.rotate(player.direction);
+    minimapCtx.beginPath();
+    minimapCtx.moveTo(6, 0);
+    minimapCtx.lineTo(-4, -4);
+    minimapCtx.lineTo(-4, 4);
+    minimapCtx.closePath();
+    
+    if (currentFuel <= 0) {
+        minimapCtx.fillStyle = "#ff4444";
+    } else {
+        minimapCtx.fillStyle = "#0ff";
+    }
+    minimapCtx.shadowBlur = 4;
+    minimapCtx.shadowColor = "#0ff";
+    minimapCtx.fill();
+    minimapCtx.restore();
+    minimapCtx.shadowBlur = 0;
+    
+    minimapCtx.strokeStyle = "#0ff";
+    minimapCtx.lineWidth = 1.5;
+    minimapCtx.strokeRect(0, 0, size, size);
 }
 
 const sun = { x: 0, y: 0, radius: 110, mass: 65000, color: "#ff4d00", id: 'sun' };
@@ -658,6 +1343,7 @@ function update() {
         p.x = sun.x + Math.cos(p.angle) * p.orbitRadius;
         p.y = sun.y + Math.sin(p.angle) * p.orbitRadius;
     });
+    blackHoles.forEach(bh => bh.update());
     player.update(planets, sun);
 }
 
@@ -674,6 +1360,10 @@ function draw() {
         ctx.stroke();
     });
     ctx.setLineDash([]);
+    
+    // Draw black holes
+    blackHoles.forEach(bh => bh.draw(ctx, camera));
+    
     const sunX = sun.x - camera.x;
     const sunY = sun.y - camera.y;
     drawCosineRings(sunX, sunY, sun.radius);
@@ -699,6 +1389,7 @@ function draw() {
         }
     });
     player.draw(ctx, camera);
+    drawMinimap(player, sun, planets);
 }
 
 function loop() {
@@ -706,6 +1397,10 @@ function loop() {
     draw();
     requestAnimationFrame(loop);
 }
+
+// Initialize
+initAudio();
+updateFuelDisplay();
 window.onload = loop;
 </script>
 </body>
