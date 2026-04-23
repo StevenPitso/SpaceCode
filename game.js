@@ -371,12 +371,21 @@ function draw() {
         const y = b.y - camera.y;
         ctx.fillStyle = b.color;
         ctx.beginPath(); ctx.arc(x, y, b.radius, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = "#aaa"; ctx.font = "10px Courier New"; ctx.textAlign = "center";
-        ctx.fillText(b.name.toUpperCase(), x, y + b.radius + 20);
+        
+        // Scale font for mobile
+        const fontSize = Math.max(8, Math.min(10, window.innerWidth / 80));
+        ctx.fillStyle = "#aaa"; 
+        ctx.font = `${fontSize}px Courier New`; 
+        ctx.textAlign = "center";
+        ctx.fillText(b.name.toUpperCase(), x, y + b.radius + 15);
         if (b.hasFlag) {
-            ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5; ctx.beginPath();
-            ctx.moveTo(x, y - b.radius); ctx.lineTo(x, y - b.radius - 14);
-            ctx.lineTo(x + 10, y - b.radius - 10); ctx.lineTo(x, y - b.radius - 6);
+            ctx.strokeStyle = "#fff"; 
+            ctx.lineWidth = Math.max(1, window.innerWidth / 800);
+            ctx.beginPath();
+            ctx.moveTo(x, y - b.radius); 
+            ctx.lineTo(x, y - b.radius - 12);
+            ctx.lineTo(x + 8, y - b.radius - 8); 
+            ctx.lineTo(x, y - b.radius - 5);
             ctx.stroke();
         }
     });
@@ -485,7 +494,33 @@ function animate() {
     requestAnimationFrame(animate);
 }
 
+// Mobile hint dismissal with localStorage
+function dismissHint() {
+    const hint = document.getElementById("mobile-controls-hint");
+    hint.style.animation = "none";
+    hint.style.opacity = "0";
+    hint.style.visibility = "hidden";
+    localStorage.setItem("hintDismissed", "true");
+}
+
+// Check if hint should be shown
+function checkShowHint() {
+    const hintDismissed = localStorage.getItem("hintDismissed");
+    if (!hintDismissed && /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+        const hint = document.getElementById("mobile-controls-hint");
+        hint.style.display = "flex";
+        setTimeout(() => {
+            if (hint.style.visibility !== "hidden") {
+                hint.style.animation = "fadeInOut 3s ease-in-out forwards";
+            }
+        }, 100);
+    } else {
+        document.getElementById("mobile-controls-hint").style.display = "none";
+    }
+}
+
 // Initialize everything
 initAudio();
 updateFuelDisplay();
+checkShowHint(); // Show mobile hint if needed
 window.onload = animate;
