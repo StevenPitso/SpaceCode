@@ -1,0 +1,300 @@
+body { margin: 0; overflow: hidden; background: #0a0a0c; font-family: 'Courier New', Courier, monospace; }
+canvas { display: block; touch-action: none; }
+
+#hud, #data-overlay {
+    position: absolute;
+    color: #888da8;
+    pointer-events: none;
+    transition: opacity 0.3s;
+    z-index: 10;
+}
+
+#hud {
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.stat-box {
+    background: rgba(15, 15, 20, 0.8);
+    border: 1px solid #2a2a35;
+    padding: 10px 15px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.stat-value { color: #fff; font-weight: bold; margin-left: 5px; }
+
+#fuel-bar-container {
+    background: rgba(15, 15, 20, 0.8);
+    border: 1px solid #2a2a35;
+    padding: 10px 15px;
+    min-width: 150px;
+}
+
+#fuel-bar {
+    width: 100%;
+    height: 12px;
+    background: #2a2a35;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-top: 5px;
+}
+
+#fuel-fill {
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(90deg, #0ff, #0f0);
+    transition: width 0.2s, background 0.3s;
+    border-radius: 6px;
+}
+
+.fuel-warning { color: #ff4444; animation: pulse 1s infinite; }
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+#data-overlay {
+    bottom: 30px;
+    left: 30px;
+    font-size: 11px;
+    line-height: 1.4;
+}
+
+#minimap-container {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 180px;
+    height: 180px;
+    background: rgba(10, 10, 15, 0.85);
+    border: 1px solid #2a2a35;
+    border-radius: 12px;
+    backdrop-filter: blur(5px);
+    z-index: 20;
+    pointer-events: none;
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+}
+
+#minimap-title {
+    position: absolute;
+    top: 5px;
+    left: 8px;
+    font-size: 8px;
+    color: #0ff;
+    letter-spacing: 1px;
+    font-weight: bold;
+    text-transform: uppercase;
+    z-index: 21;
+    pointer-events: none;
+}
+
+canvas#minimap {
+    width: 100%;
+    height: 100%;
+    border-radius: 12px;
+    display: block;
+}
+
+#planet-popup {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(10, 10, 15, 0.95);
+    border: 2px solid #0ff;
+    padding: 25px;
+    width: 90%;
+    max-width: 400px;
+    color: white;
+    display: none;
+    text-align: center;
+    border-radius: 12px;
+    box-shadow: 0 0 30px rgba(0, 255, 255, 0.2);
+    z-index: 100;
+}
+
+#planet-popup h3 { 
+    margin: 10px 0; 
+    color: #0ff; 
+    letter-spacing: 3px; 
+    font-size: 24px;
+}
+
+.share-btn {
+    margin-top: 15px;
+    background: #0ff;
+    border: none;
+    color: #000;
+    padding: 18px 25px;
+    font-family: inherit;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 900;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+    border-radius: 8px;
+    text-transform: uppercase;
+}
+
+.share-btn:active { transform: scale(0.95); background: #fff; }
+
+.social-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.social-btn {
+    padding: 15px;
+    font-size: 11px;
+    font-weight: bold;
+    background: #2a2a35;
+    color: white;
+    border: 1px solid #444;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    text-transform: uppercase;
+}
+
+.social-btn:active { background: #444; }
+
+#toast {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #0ff;
+    color: #000;
+    padding: 15px 25px;
+    font-size: 13px;
+    font-weight: bold;
+    border-radius: 6px;
+    display: none;
+    z-index: 4000;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+    white-space: nowrap;
+}
+
+#screenshot-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.95);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    padding: 20px;
+}
+
+#preview-img {
+    max-width: 100%;
+    max-height: 40%;
+    border: 3px solid #0ff;
+    border-radius: 12px;
+    margin-bottom: 20px;
+}
+
+.exit-x {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    color: #0ff;
+    font-size: 24px;
+    cursor: pointer;
+    font-weight: bold;
+    padding: 5px;
+    line-height: 1;
+}
+
+.exit-x:hover { color: #fff; }
+
+.close-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    color: #fff;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid #fff;
+    padding: 12px 20px;
+    cursor: pointer;
+    border-radius: 8px;
+    font-weight: bold;
+    pointer-events: auto;
+}
+
+.guide-text {
+    color: #888;
+    font-size: 10px;
+    margin-top: 10px;
+    text-transform: uppercase;
+}
+
+#game-over {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.95);
+    border: 3px solid #ff4444;
+    padding: 40px;
+    text-align: center;
+    z-index: 3000;
+    display: none;
+    border-radius: 20px;
+    min-width: 300px;
+}
+
+#game-over h2 { color: #ff4444; margin-bottom: 20px; }
+
+#game-over button {
+    background: #0ff;
+    border: none;
+    padding: 15px 30px;
+    margin-top: 20px;
+    font-weight: bold;
+    cursor: pointer;
+    font-family: monospace;
+    font-size: 16px;
+}
+
+#blackhole-warning {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #ff00ff;
+    font-size: 24px;
+    font-weight: bold;
+    text-shadow: 0 0 20px #ff00ff;
+    pointer-events: none;
+    z-index: 15;
+    opacity: 0;
+    transition: opacity 0.3s;
+    white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    #minimap-container { width: 130px; height: 130px; top: 10px; right: 10px; }
+    #minimap-title { font-size: 6px; }
+    .stat-box { padding: 6px 10px; font-size: 9px; }
+    #fuel-bar-container { padding: 6px 10px; min-width: 100px; }
+    #blackhole-warning { font-size: 16px; white-space: nowrap; }
+}
