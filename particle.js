@@ -1,12 +1,10 @@
 class Particle {
     constructor(x, y, vx, vy) {
-
         this.x = x; this.y = y;
         this.vx = vx * 0.4 + (Math.random()-0.5);
         this.vy = vy * 0.4 + (Math.random()-0.5);
         this.life = 1.0;
         this.size = 2 + Math.random() * 4;
-
     }
     update() {
         this.x += this.vx; this.y += this.vy;

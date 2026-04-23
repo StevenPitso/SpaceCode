@@ -21,7 +21,7 @@ I hope this is AMAZE AMAZE :)
 
     STAR: MARSHMALLOW^M (TM-41126)<br>
     STATUS: GRAVITY WELL ACTIVE<br>
-    SENSORS: VECTOR OVERLAY ENABLED<br>
+    MISSION: VISIT ALL 9 PLANETS (NO REFUEL)<br>
     BODIES: <span id="bodies-count">0 / 9</span>
 
 </div>
@@ -32,7 +32,18 @@ I hope this is AMAZE AMAZE :)
 
     <div class="stat-box">POWER:<span id="power" class="stat-value">0%</span></div>
     <div class="stat-box">COORD:<span id="coord" class="stat-value">0,0</span></div>
+    <div id="fuel-bar-container">
+        FUEL: <span id="fuel-value" class="stat-value">1000</span>
+        <div id="fuel-bar">
+            <div id="fuel-fill"></div>
+        </div>
+    </div>
+</div>
 
+<!-- Minimap Container -->
+<div id="minimap-container">
+    <div id="minimap-title">SENSOR MAP</div>
+    <canvas id="minimap" width="180" height="180"></canvas>
 </div>
 
 <div id="planet-popup">
@@ -75,12 +86,23 @@ I hope this is AMAZE AMAZE :)
     </div>
 </div>
 
+<div id="game-over">
+    <h2 id="game-over-title">MISSION FAILED</h2>
+    <p id="game-over-message">You ran out of fuel!</p>
+    <p id="planets-visited">Planets visited: 0/9</p>
+    <button onclick="resetGame()">⟳ RESTART MISSION</button>
+</div>
+
+<div id="blackhole-warning">⚠️ ENTERING EVENT HORIZON ⚠️</div>
+
 <canvas id="canvas"></canvas>
 
-  <script src="particle.js"></script>
-  <script src="controls.js"></script>
-  <script src="player.js"></script>
-  <script src="game.js"></script>
+<script src="sound.js"></script>
+<script src="particle.js"></script>
+<script src="controls.js"></script>
+<script src="player.js"></script>
+<script src="blackhole.js"></script>
+<script src="game.js"></script>
 
 </body>
    
