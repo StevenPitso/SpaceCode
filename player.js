@@ -19,7 +19,7 @@ class Player {
         const dist = Math.hypot(dx, dy);
         this.direction = Math.atan2(dy, dx);
 
-        if (this.controls.mouse.isDown && currentFuel > 0) {
+        if (this.controls.isTouching() && currentFuel > 0) {
             this.thrust = Math.min(dist / MAX_THRUST_DIST, 1);
             const force = this.thrust * MAX_THRUST_FORCE;
             
@@ -39,7 +39,8 @@ class Player {
                 this.vy += Math.sin(this.direction) * 3.5;
             }
             
-            if (Math.random() > 0.4 && currentFuel > 0) {
+            // Reduce particle count on mobile for performance
+            if (Math.random() > 0.5 && currentFuel > 0) {
                 this.particles.push(new Particle(this.x, this.y, -Math.cos(this.direction)*2.5, -Math.sin(this.direction)*2.5));
             }
         } else {
@@ -81,6 +82,11 @@ class Player {
                         playSound('landing');
                         showPlanetData(p);
                         checkMissionComplete();
+                        
+                        // Haptic feedback on landing (mobile)
+                        if (window.navigator && window.navigator.vibrate) {
+                            window.navigator.vibrate([100, 50, 100]);
+                        }
                     }
                 } else if (this.landedOn !== p) {
                     const nx = pdx / distToBody; const ny = pdy / distToBody;
@@ -94,12 +100,10 @@ class Player {
             if (p.hasFlag) claimedCount++;
         });
         
-        // Apply black hole gravity
         for (let bh of blackHoles) {
             if (bh.applyGravity(this)) return;
         }
         
-        // Sun hazard
         const distToSun = Math.hypot(sun.x - this.x, sun.y - this.y);
         if (distToSun < sun.radius + this.radius && gameActive) {
             gameActive = false;
@@ -111,6 +115,10 @@ class Player {
             document.getElementById("planets-visited").innerHTML = `Planets visited: ${visited}/9`;
             document.getElementById("game-over").style.display = "block";
             showToast("CRITICAL: SOLAR INCINERATION");
+            
+            if (window.navigator && window.navigator.vibrate) {
+                window.navigator.vibrate([200, 100, 200]);
+            }
             return;
         }
 
@@ -129,6 +137,11 @@ class Player {
             }
         }
 
+        // Limit particles for mobile performance
+        if (this.particles.length > 100) {
+            this.particles = this.particles.slice(-80);
+        }
+        
         this.particles.forEach(p => p.update());
         this.particles = this.particles.filter(p => p.life > 0);
 
@@ -150,7 +163,7 @@ class Player {
         const shipScreenX = canvas.width / 2;
         const shipScreenY = canvas.height / 2;
 
-        if (this.controls.mouse.isDown && !isPaused && gameActive && currentFuel > 0) {
+        if (this.controls.isTouching() && !isPaused && gameActive && currentFuel > 0) {
             ctx.setLineDash([5, 5]);
             ctx.strokeStyle = "rgba(0, 255, 255, 0.4)";
             ctx.beginPath();
@@ -173,10 +186,10 @@ class Player {
         const currentSpeed = Math.hypot(this.vx, this.vy);
         if (currentSpeed > 0.1) {
             ctx.strokeStyle = "#4da6ff";
-            ctx.lineWidth = 2;
+            ctx.lineWidth = Math.max(1, window.innerWidth / 500); // Scale line width
             ctx.beginPath();
             ctx.moveTo(shipScreenX, shipScreenY);
-            const vectorScale = 8;
+            const vectorScale = Math.min(8, window.innerWidth / 60);
             ctx.lineTo(shipScreenX + this.vx * vectorScale, shipScreenY + this.vy * vectorScale);
             ctx.stroke();
             
@@ -195,29 +208,32 @@ class Player {
         }
 
         if (this.slingshotMessage && this.slingshotTimer > 0) {
-            ctx.font = "bold 12px 'Courier New'";
+            ctx.font = `bold ${Math.max(10, Math.min(14, window.innerWidth / 40))}px 'Courier New'`;
             ctx.fillStyle = "#ffaa44";
             ctx.shadowBlur = 5;
             ctx.shadowColor = "#ffaa44";
-            ctx.fillText(this.slingshotMessage, shipScreenX - 100, shipScreenY - 50);
+            const textWidth = ctx.measureText(this.slingshotMessage).width;
+            ctx.fillText(this.slingshotMessage, shipScreenX - textWidth / 2, shipScreenY - 50);
             ctx.shadowBlur = 0;
         }
 
+        // Adjust UI elements size based on screen size
+        const ringRadius = Math.min(25, window.innerWidth / 20);
         ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
         ctx.beginPath();
-        ctx.arc(shipScreenX, shipScreenY, 25, 0, Math.PI * 2);
+        ctx.arc(shipScreenX, shipScreenY, ringRadius, 0, Math.PI * 2);
         ctx.stroke();
         
         ctx.strokeStyle = "#0ff";
         ctx.beginPath();
-        ctx.arc(shipScreenX + Math.cos(this.direction) * 25, shipScreenY + Math.sin(this.direction) * 25, 2, 0, Math.PI * 2);
+        ctx.arc(shipScreenX + Math.cos(this.direction) * ringRadius, shipScreenY + Math.sin(this.direction) * ringRadius, 2, 0, Math.PI * 2);
         ctx.stroke();
 
         ctx.save();
         ctx.translate(shipScreenX, shipScreenY);
         ctx.rotate(this.direction + Math.PI / 2);
         ctx.strokeStyle = "#fff";
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = Math.max(1, window.innerWidth / 600);
         ctx.beginPath();
         ctx.arc(0, 0, 8, Math.PI, 0); 
         ctx.lineTo(8, 10); ctx.lineTo(-8, 10);
@@ -237,9 +253,9 @@ class Player {
         ctx.restore();
         
         if (currentFuel < 200 && currentFuel > 0 && !this.landedOn) {
-            ctx.font = "bold 10px 'Courier New'";
+            ctx.font = `bold ${Math.max(10, Math.min(12, window.innerWidth / 50))}px 'Courier New'`;
             ctx.fillStyle = "#ff4444";
-            ctx.fillText("⚠️ LOW FUEL", shipScreenX - 40, shipScreenY - 70);
+            ctx.fillText("⚠️ LOW FUEL", shipScreenX - 45, shipScreenY - 70);
         }
     }
 }
