@@ -442,29 +442,55 @@ async function copyImageToClipboard() {
     }
 }
 
-function shareSocial(platform) {
+async function shareSocial(platform) {
     const url = window.location.href;
-    const text = `🚀 I've discovered Planet ${pName.innerText} in DevSoc Space! ${pDesc.innerText}\n\nFuel remaining: ${Math.floor(currentFuel)}/${MAX_FUEL}\n\nExplore with me: ${url}\n\n#DevSoc #SpaceExploration #FuelEconomy`;
-    
+    const text = `🚀 I've discovered Planet ${pName.innerText} in UJDevSoc Space! ${pDesc.innerText}\n\nExplore with me: ${url}\n\n#DevSoc #SpaceExploration`;
+
+    try {
+        // PRIMARY: Native share sheet (BEST OPTION)
+        if (navigator.share) {
+            await navigator.share({
+                title: `Planet ${pName.innerText}`,
+                text: text,
+                url: url
+            });
+
+            showToast("SHARE OPENED 🚀");
+            return;
+        }
+    } catch (err) {
+        console.log("Native share cancelled or failed:", err);
+    }
+
+    //  FALLBACKS (desktop / unsupported browsers)
     if (platform === 'linkedin') {
-        const shareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}&summary=${encodeURIComponent(text)}`;
+        const shareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
         window.open(shareUrl, '_blank');
-        showToast("PRE-FILLING LINKEDIN...");
-    } else if (platform === 'instagram' || platform === 'tiktok') {
+        showToast("OPENING LINKEDIN...");
+    }
+
+    else if (platform === 'instagram' || platform === 'tiktok') {
         try {
+            await navigator.clipboard.writeText(text);
+            showToast("CAPTION COPIED!");
+        } catch (e) {
+            // fallback old method
             const tempInput = document.createElement("textarea");
             tempInput.value = text;
             document.body.appendChild(tempInput);
             tempInput.select();
             document.execCommand("copy");
             document.body.removeChild(tempInput);
-            showToast("CAPTION & URL COPIED!");
-        } catch(e) {}
+            showToast("CAPTION COPIED!");
+        }
 
-        const target = platform === 'instagram' ? "https://www.instagram.com/" : "https://www.tiktok.com/upload";
+        const target = platform === 'instagram'
+            ? "https://www.instagram.com/"
+            : "https://www.tiktok.com/upload";
+
         setTimeout(() => {
             window.open(target, '_blank');
-        }, 1200);
+        }, 800);
     }
 }
 
